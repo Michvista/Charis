@@ -48,54 +48,6 @@ The project is intentionally split into bounded contexts:
 
 This repository is well-suited for a phased build and content plan.
 
-### Development Rhythm
-
-- **DSA practice**: 20–30 minutes per day, separate from the project.
-  - Keep your algorithm practice outside the codebase.
-  - Use it to sharpen reasoning and problem-solving, not to directly implement project features.
-- **YouTube content**: one video per completed phase, not per code change.
-  - Build a clear episode arc around completed milestones.
-  - This creates stronger storytelling and avoids fragmenting progress into too many micro-episodes.
-
-### Suggested Phase Structure
-
-1. **Phase 1 — Core data and wardrobe model**
-   - Django user/auth
-   - Wardrobe CRUD and image tagging pipeline
-   - Basic frontend wardrobe experience
-2. **Phase 2 — Styling intelligence**
-   - DolphJS outfit/occasion models
-   - Combo generation and outfit verdict flow
-   - Async job orchestration with Redis/BullMQ
-3. **Phase 3 — Analytics and trip planning**
-   - Wear frequency, cost-per-wear, and category dashboards
-   - Trip packing and suggested outfits
-4. **Phase 4 — Social and personalization**
-   - Outfit sharing, comments, votes
-   - Style advisor knowledge retrieval
-   - Notifications and user engagement flow
-
-## Alternative Big-Project Idea
-
-If you want a second option before locking in the final portfolio project, consider a **Campus Marketplace + Services Platform**. It maps to the same architecture but in a different domain:
-
-- Marketplace — student items, services, tutoring
-- Logistics/Matching — buyer/seller/runner routing and matching
-- Escrow/Payments — hold funds until delivery confirmed
-- Chat — buyer-seller negotiation
-- Notifications — DolphJS-powered delivery status alerts
-- Analytics — seller dashboards with Recharts
-- Support RAG — FAQ/help bot retrieval
-
-This alternative offers a stronger DSA story on matching and routing, while Charis offers a stronger visual and product demo for fashion AI.
-
-## Why Charis Still Makes Great Portfolio Sense
-
-- Fashion intelligence is easy to demo with visual results.
-- The service split is a strong technical story.
-- You can show a real app with both a data-backed backend and a separate AI/microservice intelligence layer.
-- The design is recruiter-friendly and can still include deep algorithmic work behind the scenes.
-
 ## Repo Structure
 
 - `backend/`: Django app modules, REST APIs, queue client, domain services
@@ -103,6 +55,3 @@ This alternative offers a stronger DSA story on matching and routing, while Char
 - `job-worker/`: BullMQ queues and workers for async processing
 - `styling-service/`: DolphinJS styling/AI service with Prisma models
 
-## Notes
-
-This README is meant as a reference summary and content planning guide. Keep the codebase and the DSA practice separate, and use completed milestones as the natural units for YouTube episodes.

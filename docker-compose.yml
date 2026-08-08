@@ -1,0 +1,83 @@
+services:
+  # Infrastructure
+  redis:
+    image: redis:7-alpine
+    container_name: charis_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend (Django)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: charis_backend
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # Styling Service (DolphJS)
+  styling-service:
+    build:
+      context: ./styling-service
+      dockerfile: Dockerfile
+    container_name: charis_styling
+    volumes:
+      - ./styling-service:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # Job Worker (BullMQ)
+  job-worker:
+    build:
+      context: ./job-worker
+      dockerfile: Dockerfile
+    container_name: charis_worker
+    volumes:
+      - ./job-worker:/app
+      - /app/node_modules
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # Frontend (React + Vite)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: charis_frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    env_file:
+      - .env
+    depends_on:
+      - backend
+      - styling-service
+
+volumes:
+  redis_data:

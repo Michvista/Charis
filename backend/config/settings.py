@@ -2,21 +2,17 @@ from pathlib import Path
 from datetime import timedelta
 import os
 import dj_database_url
-
 from dotenv import load_dotenv
-
 
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv("SECRET_KEY")
-
+SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-dev-key-change-in-production")
 DEBUG = os.getenv("DEBUG", "True") == "True"
-
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
-#   Apps                                    
+#   Apps                               
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -25,11 +21,14 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    
     # Third party
     "rest_framework",
     "rest_framework_simplejwt",
+    'rest_framework_simplejwt.token_blacklist',
     "corsheaders",
-    # Your apps
+    
+    # Local domain apps
     "apps.accounts",
     "apps.wardrobe",
     "apps.tripplanner",
@@ -38,12 +37,13 @@ INSTALLED_APPS = [
     "apps.styleadvisor",
 ]
 
-AUTH_USER_MODEL = 'accounts.User'
+# CRITICAL: Define Custom User Model BEFORE initial migrations
+AUTH_USER_MODEL = "accounts.User"
 
-#   Middleware                                 ─
+#   Middleware                            ─
 
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",   # must be first
+    "corsheaders.middleware.CorsMiddleware",   # Must be first
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -73,23 +73,17 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-#   Database                                  ─
+#   Database                             
 
 DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL'),
+    "default": dj_database_url.config(
+        default=os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'db.sqlite3'}"),
         conn_max_age=600,
-        ssl_require=True
+        ssl_require=False if os.getenv("DATABASE_URL", "").startswith("sqlite") else True,
     )
 }
 
-#   Custom User Model                              
-# CRITICAL: this must be set before the first migration
-# Changing it after migrating is extremely painful
-
-AUTH_USER_MODEL = "accounts.User"
-
-#   Authentication                               ─
+#   Authentication & DRF                       
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -107,18 +101,18 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
-#   CORS                                    ─
+#   CORS                               
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",   # React frontend (Vite default port)
+    "http://localhost:5173",   # React frontend (Vite default)
     "http://127.0.0.1:5173",
 ]
 
-#   Redis                                    
+#   Redis                              ─
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
-#   Password Validation                             
+#   Password Validation & Defaults                 ─
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -127,19 +121,13 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-#   Internationalisation                            ─
-
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
-#   Static Files                                ─
-
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-
-#   Media / Uploads                               
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"

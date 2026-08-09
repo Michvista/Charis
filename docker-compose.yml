@@ -30,54 +30,54 @@ services:
       redis:
         condition: service_healthy
 
-  # Styling Service (DolphJS)
-  styling-service:
-    build:
-      context: ./styling-service
-      dockerfile: Dockerfile
-    container_name: charis_styling
-    volumes:
-      - ./styling-service:/app
-      - /app/node_modules
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env
-    depends_on:
-      redis:
-        condition: service_healthy
+  # # Styling Service (DolphJS)
+  # styling-service:
+  #   build:
+  #     context: ./styling-service
+  #     dockerfile: Dockerfile
+  #   container_name: charis_styling
+  #   volumes:
+  #     - ./styling-service:/app
+  #     - /app/node_modules
+  #   ports:
+  #     - "3000:3000"
+  #   env_file:
+  #     - .env
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
 
-  # Job Worker (BullMQ)
-  job-worker:
-    build:
-      context: ./job-worker
-      dockerfile: Dockerfile
-    container_name: charis_worker
-    volumes:
-      - ./job-worker:/app
-      - /app/node_modules
-    env_file:
-      - .env
-    depends_on:
-      redis:
-        condition: service_healthy
+  # # Job Worker (BullMQ)
+  # job-worker:
+  #   build:
+  #     context: ./job-worker
+  #     dockerfile: Dockerfile
+  #   container_name: charis_worker
+  #   volumes:
+  #     - ./job-worker:/app
+  #     - /app/node_modules
+  #   env_file:
+  #     - .env
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
 
-  # Frontend (React + Vite)
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: charis_frontend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    ports:
-      - "5173:5173"
-    env_file:
-      - .env
-    depends_on:
-      - backend
-      - styling-service
+  # # Frontend (React + Vite)
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   container_name: charis_frontend
+  #   volumes:
+  #     - ./frontend:/app
+  #     - /app/node_modules
+  #   ports:
+  #     - "5173:5173"
+  #   env_file:
+  #     - .env
+  #   depends_on:
+  #     - backend
+  #     - styling-service
 
 volumes:
   redis_data:

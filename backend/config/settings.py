@@ -1,10 +1,17 @@
 from pathlib import Path
 from datetime import timedelta
 import os
+import cloudinary
 import dj_database_url
 from dotenv import load_dotenv
 
 load_dotenv()
+cloudinary.config(
+    cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.getenv('CLOUDINARY_API_KEY'),
+    api_secret=os.getenv('CLOUDINARY_API_SECRET'),
+    secure=True
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -27,6 +34,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     'rest_framework_simplejwt.token_blacklist',
     "corsheaders",
+    "cloudinary",
     
     # Local domain apps
     "apps.accounts",

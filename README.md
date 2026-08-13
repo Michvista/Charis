@@ -26,12 +26,12 @@ Built in public. Every phase documented on [YouTube](#).
 
 Charis is split into four services:
 
-| Service | Framework | Owns |
-|---|---|---|
-| `backend/` | Django + DRF | Auth, Wardrobe, Trip Planner, Social, Analytics, Style Advisor |
-| `styling-service/` | DolphJS (Spring OOP) | Occasions, Outfits, Verdict, Combo generation |
-| `job-worker/` | Node + BullMQ | Async jobs: image tagging, verdict, combos, notifications |
-| `frontend/` | React + Vite | All UI |
+| Service            | Framework            | Owns                                                           |
+| ------------------ | -------------------- | -------------------------------------------------------------- |
+| `backend/`         | Django + DRF         | Auth, Wardrobe, Trip Planner, Social, Analytics, Style Advisor |
+| `styling-service/` | DolphJS (Spring OOP) | Occasions, Outfits, Verdict, Combo generation                  |
+| `job-worker/`      | Node + BullMQ        | Async jobs: image tagging, verdict, combos, notifications      |
+| `frontend/`        | React + Vite         | All UI                                                         |
 
 Shared infrastructure: **Postgres** · **Redis**
 
@@ -65,19 +65,19 @@ frontend poll resolves → renders verdict
 
 ## Stack
 
-| Layer | Technology |
-|---|---|
-| Core backend | Python · Django · Django REST Framework |
-| Styling service | TypeScript · DolphJS · TypeORM |
-| Async jobs | Node · BullMQ · Redis |
-| Frontend | React · Vite · TypeScript |
-| Animations | Framer Motion |
-| Charts | Recharts |
-| Database | PostgreSQL |
-| Image storage | Cloudinary |
-| AI | Groq / Gemini Vision |
-| RAG | Google File Store |
-| Containers | Docker · Docker Compose |
+| Layer           | Technology                              |
+| --------------- | --------------------------------------- |
+| Core backend    | Python · Django · Django REST Framework |
+| Styling service | TypeScript · DolphJS · TypeORM          |
+| Async jobs      | Node · BullMQ · Redis                   |
+| Frontend        | React · Vite · TypeScript               |
+| Animations      | Framer Motion                           |
+| Charts          | Recharts                                |
+| Database        | PostgreSQL                              |
+| Image storage   | Cloudinary                              |
+| AI              | Groq / Gemini Vision                    |
+| RAG             | Google File Store                       |
+| Containers      | Docker · Docker Compose                 |
 
 ---
 
@@ -85,12 +85,12 @@ frontend poll resolves → renders verdict
 
 This project uses real algorithms for real product reasons — not leetcode exercises bolted on for the sake of it.
 
-| Algorithm | Location | Why |
-|---|---|---|
-| Backtracking + constraint pruning | `styling-service/src/components/combos/combos.algorithms.ts` | Generates valid outfit combos from N wardrobe items without brute-forcing every permutation |
-| Weighted graph scoring | `styling-service/src/components/verdict/verdict.algorithms.ts` | Models color/formality compatibility as weighted edges; combo score = traversal over that graph |
-| Greedy set-cover approximation | `backend/apps/tripplanner/algorithms.py` | Selects minimum wardrobe items to cover all trip events — NP-hard in general, greedy gives a fast near-optimal solution |
-| Sliding window aggregation | `backend/apps/analytics/aggregations.py` | Computes wear frequency within a time window without a full table scan |
+| Algorithm                         | Location                                                       | Why                                                                                                                     |
+| --------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Backtracking + constraint pruning | `styling-service/src/components/combos/combos.algorithms.ts`   | Generates valid outfit combos from N wardrobe items without brute-forcing every permutation                             |
+| Weighted graph scoring            | `styling-service/src/components/verdict/verdict.algorithms.ts` | Models color/formality compatibility as weighted edges; combo score = traversal over that graph                         |
+| Greedy set-cover approximation    | `backend/apps/tripplanner/algorithms.py`                       | Selects minimum wardrobe items to cover all trip events — NP-hard in general, greedy gives a fast near-optimal solution |
+| Sliding window aggregation        | `backend/apps/analytics/aggregations.py`                       | Computes wear frequency within a time window without a full table scan                                                  |
 
 ---
 

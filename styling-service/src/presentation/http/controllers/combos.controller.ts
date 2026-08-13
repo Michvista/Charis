@@ -2,6 +2,7 @@ import { DolphControllerHandler } from '@dolphjs/dolph/classes';
 import { Dolph, SuccessResponse } from '@dolphjs/dolph/common';
 import { Route, Post, DBody, DRes, Shield, DReq } from '@dolphjs/dolph/decorators';
 import { GenerateCombosUseCase } from '../../../application/outfit/use-cases/generate-combos.use-case';
+import { TypeOrmOccasionRepository } from '../../../infrastructure/database/typeorm/repositories/typeorm-occasion.repository';
 import { authShield } from '../shields/auth.shield';
 
 @Shield(authShield)
@@ -11,7 +12,7 @@ export class CombosController extends DolphControllerHandler<Dolph> {
 
   constructor() {
     super();
-    this.generateUseCase = new GenerateCombosUseCase();
+    this.generateUseCase = new GenerateCombosUseCase(new TypeOrmOccasionRepository());
   }
 
   @Post()
@@ -27,6 +28,7 @@ export class CombosController extends DolphControllerHandler<Dolph> {
 
     const dto = {
       userId,
+      occasionId: body.occasionId,
       items: body.items || [],
     };
 

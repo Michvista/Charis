@@ -7,6 +7,7 @@ import {
 
 export interface GenerateCombosDTO {
   userId: string;
+  occasionId?: string;
   items: WardrobeItemInput[];
 }
 

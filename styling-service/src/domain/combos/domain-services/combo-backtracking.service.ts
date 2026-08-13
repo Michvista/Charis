@@ -1,5 +1,11 @@
 // Combo backtracking domain service
 
+import {
+  CompatibilityContext,
+  StyleCompatibilityService,
+  StyleItemInput,
+} from "../../shared/services/style-compatibility.service";
+
 export interface WardrobeItemInput {
   id: string;
   category: "TOP" | "BOTTOM" | "SHOES" | "OUTERWEAR" | "ACCESSORY";
@@ -14,16 +20,29 @@ export interface CombinationResult {
   score: number;
 }
 
+export interface ComboSearchOptions {
+  occasionFormality?: number;
+  maxResults?: number;
+}
+
 export class ComboBacktrackingDomainService {
+  private readonly compatibilityService = new StyleCompatibilityService();
   private readonly requiredRoles = ["TOP", "BOTTOM", "SHOES"];
   private readonly roleOrder = ["TOP", "BOTTOM", "SHOES", "OUTERWEAR", "ACCESSORY"];
 
-  public generateCombinations(items: WardrobeItemInput[]): CombinationResult[] {
+  public generateCombinations(
+    items: WardrobeItemInput[],
+    options: ComboSearchOptions = {},
+  ): CombinationResult[] {
     const results: CombinationResult[] = [];
     const groups = this.groupByRole(items);
     const current: WardrobeItemInput[] = [];
+    const context: CompatibilityContext = {
+      occasionFormality: options.occasionFormality,
+    };
+    const bestScore = { value: Number.NEGATIVE_INFINITY };
 
-    this.backtrack(0, groups, current, results);
+    this.backtrack(0, groups, current, results, context, bestScore, options.maxResults ?? Number.POSITIVE_INFINITY);
 
     return results.sort((a, b) => b.score - a.score);
   }
@@ -33,35 +52,59 @@ export class ComboBacktrackingDomainService {
     groups: Map<string, WardrobeItemInput[]>,
     current: WardrobeItemInput[],
     results: CombinationResult[],
+    context: CompatibilityContext,
+    bestScore: { value: number },
+    maxResults: number,
   ): void {
     if (roleIndex >= this.roleOrder.length) {
       if (this.isValidCombination(current)) {
+        const score = this.scoreCombination(current, context);
+        if (score >= bestScore.value) {
+          bestScore.value = score;
+        }
         results.push({
           comboId: crypto.randomUUID(),
           items: [...current],
-          score: this.scoreCombination(current),
+          score,
         });
       }
       return;
     }
 
     const role = this.roleOrder[roleIndex];
-    const candidates = groups.get(role) || [];
+    const candidates = this.rankCandidates(groups.get(role) || [], current, context);
+    const remainingGroups = this.remainingGroups(groups, roleIndex);
+
+    const optimisticUpperBound = this.compatibilityService.estimateUpperBound(
+      current,
+      remainingGroups,
+      context,
+    );
+
+    if (optimisticUpperBound < bestScore.value - 1 || results.length >= maxResults) {
+      return;
+    }
 
     if (this.requiredRoles.includes(role) && candidates.length === 0) {
       return;
     }
 
     if (candidates.length === 0) {
-      this.backtrack(roleIndex + 1, groups, current, results);
+      this.backtrack(roleIndex + 1, groups, current, results, context, bestScore, maxResults);
       return;
     }
 
     for (const candidate of candidates) {
       current.push(candidate);
 
-      if (this.isPromising(current, results)) {
-        this.backtrack(roleIndex + 1, groups, current, results);
+      const partialBound = this.compatibilityService.estimateUpperBound(
+        current,
+        this.remainingGroups(groups, roleIndex + 1),
+        context,
+      );
+
+      if (partialBound >= bestScore.value - 1) {
+        this.backtrack(roleIndex + 1, groups, current, results, context, bestScore, maxResults);
       }
 
       current.pop();
@@ -86,94 +129,69 @@ export class ComboBacktrackingDomainService {
     return this.requiredRoles.every((role) => roles.includes(role));
   }
 
-  private isPromising(
+  private rankCandidates(
+    candidates: WardrobeItemInput[],
     current: WardrobeItemInput[],
-    results: CombinationResult[],
-  ): boolean {
-    const score = this.scoreCombination(current);
-    const bestKnown = results[0]?.score ?? 0;
-    return current.length < this.requiredRoles.length || score >= bestKnown - 5;
+    context: CompatibilityContext,
+  ): WardrobeItemInput[] {
+    return [...candidates].sort((left, right) => {
+      const leftScore = this.estimateItemPotential(left, current, context);
+      const rightScore = this.estimateItemPotential(right, current, context);
+      if (rightScore !== leftScore) {
+        return rightScore - leftScore;
+      }
+      return left.id.localeCompare(right.id);
+    });
   }
 
-  private scoreCombination(items: WardrobeItemInput[]): number {
-    if (!this.isValidCombination(items)) {
-      return 0;
-    }
-
-    let score = 40;
-    const normalized = items.map((item) => ({
-      ...item,
-      category: item.category.toUpperCase() as WardrobeItemInput["category"],
-    }));
-
-    const top = normalized.find((item) => item.category === "TOP");
-    const bottom = normalized.find((item) => item.category === "BOTTOM");
-    const shoes = normalized.find((item) => item.category === "SHOES");
-    const outerwear = normalized.find((item) => item.category === "OUTERWEAR");
-    const accessoryCount = normalized.filter(
-      (item) => item.category === "ACCESSORY",
-    ).length;
-
-    if (top && bottom) {
-      score += this.evaluateColorHarmony(top.colorHex, bottom.colorHex);
-    }
-
-    if (bottom && shoes) {
-      score += this.evaluateColorHarmony(bottom.colorHex, shoes.colorHex) * 0.75;
-    }
-
-    if (top && shoes) {
-      score += this.evaluateColorHarmony(top.colorHex, shoes.colorHex) * 0.5;
-    }
-
-    if (outerwear) {
-      score += 8;
-    }
-
-    score += Math.min(10, accessoryCount * 3);
-    score += this.evaluateFormalitySpread(normalized);
-
-    return Math.min(100, Math.round(score));
+  private scoreCombination(
+    items: WardrobeItemInput[],
+    context: CompatibilityContext,
+  ): number {
+    return this.compatibilityService.scoreOutfit(
+      items as unknown as StyleItemInput[],
+      context,
+    ).score;
   }
 
-  private evaluateColorHarmony(color1: string, color2: string): number {
-    if (color1 === color2) return 22;
+  private estimateItemPotential(
+    candidate: WardrobeItemInput,
+    current: WardrobeItemInput[],
+    context: CompatibilityContext,
+  ): number {
+    const roleBonus =
+      candidate.category === "TOP" || candidate.category === "BOTTOM" || candidate.category === "SHOES"
+        ? 10
+        : 6;
+    const formalityBonus =
+      typeof context.occasionFormality === "number"
+        ? Math.max(
+            0,
+            12 - Math.abs((candidate.formalityLevel ?? context.occasionFormality) - context.occasionFormality) * 3,
+          )
+        : Math.max(0, 10 - Math.abs((candidate.formalityLevel ?? 3) - 3) * 2);
+    const colorBonus = current.reduce((sum, item) => {
+      return sum + Math.max(0, this.compatibilityService.evaluateColorPair(candidate.colorHex, item.colorHex) * 0.75);
+    }, 0);
+    const seasonBonus = candidate.seasonTags?.length ? 4 : 0;
 
-    const neutrals = ["#000000", "#ffffff", "#ffffff", "#f5f5f5", "#808080"];
-    const isNeutral = (color: string) =>
-      neutrals.includes(color.toLowerCase()) ||
-      ["black", "white", "gray", "grey", "navy"].some((value) =>
-        color.toLowerCase().includes(value),
-      );
-
-    if (isNeutral(color1) || isNeutral(color2)) {
-      return 18;
-    }
-
-    return 12;
+    return roleBonus + formalityBonus + colorBonus + seasonBonus;
   }
 
-  private evaluateFormalitySpread(items: WardrobeItemInput[]): number {
-    const levels = items
-      .map((item) => item.formalityLevel || 1)
-      .filter((level) => level >= 1 && level <= 5);
+  private remainingGroups(
+    groups: Map<string, WardrobeItemInput[]>,
+    roleIndex: number,
+  ): Array<{ role: string; items: WardrobeItemInput[] }> {
+    const remaining: Array<{ role: string; items: WardrobeItemInput[] }> = [];
 
-    if (levels.length === 0) {
-      return 0;
+    for (let index = roleIndex; index < this.roleOrder.length; index += 1) {
+      const role = this.roleOrder[index];
+      const items = groups.get(role);
+      if (items && items.length > 0) {
+        remaining.push({ role, items });
+      }
     }
 
-    const min = Math.min(...levels);
-    const max = Math.max(...levels);
-    const spread = max - min;
-
-    if (spread <= 1) {
-      return 10;
-    }
-
-    if (spread === 2) {
-      return 6;
-    }
-
-    return 2;
+    return remaining;
   }
 }

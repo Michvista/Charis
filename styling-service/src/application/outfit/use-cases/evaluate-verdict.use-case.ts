@@ -36,7 +36,12 @@ export class EvaluateVerdictUseCase implements IUseCase<
     }
 
     const evaluation = this.graphService.evaluateOutfit({
-      itemRoles: request.items.map((i) => i.itemRole),
+      items: request.items.map((i) => ({
+        itemRole: i.itemRole,
+        colorHex: i.colorHex,
+        formalityLevel: i.formalityLevel,
+        seasonTags: i.seasonTags,
+      })),
       occasionFormality: occasion.formalityLevel,
     });
 

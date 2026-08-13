@@ -3,7 +3,13 @@
 export interface EvaluateVerdictDTO {
   userId: string;
   occasionId?: string;
-  items: Array<{ wardrobeItemId: string; itemRole: string }>;
+  items: Array<{
+    wardrobeItemId: string;
+    itemRole: string;
+    colorHex?: string;
+    formalityLevel?: number;
+    seasonTags?: string[];
+  }>;
 }
 
 export interface VerdictResponseDTO {

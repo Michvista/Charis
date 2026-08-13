@@ -49,5 +49,6 @@ const comboResults = combos.generateCombinations(
 assert(comboResults.length > 0, "combo generation should return at least one valid combination");
 assert(comboResults.every((combo) => combo.items.some((item) => item.category === "TOP")), "generated combos should keep the required roles");
 assert(new Set(comboResults.map((combo) => combo.items.map((item) => item.id).join(","))).size === comboResults.length, "combination results should not contain duplicates");
+assert(comboResults.some((combo) => !combo.items.some((item) => item.category === "OUTERWEAR")), "optional roles should be skippable");
 
 console.log("style-compatibility smoke tests passed");

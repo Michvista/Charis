@@ -29,6 +29,7 @@ export class ComboBacktrackingDomainService {
   private readonly compatibilityService = new StyleCompatibilityService();
   private readonly requiredRoles = ["TOP", "BOTTOM", "SHOES"];
   private readonly roleOrder = ["TOP", "BOTTOM", "SHOES", "OUTERWEAR", "ACCESSORY"];
+  private readonly pruneMargin = 20;
 
   public generateCombinations(
     items: WardrobeItemInput[],
@@ -81,7 +82,7 @@ export class ComboBacktrackingDomainService {
       context,
     );
 
-    if (optimisticUpperBound < bestScore.value - 1 || results.length >= maxResults) {
+    if (optimisticUpperBound < bestScore.value - this.pruneMargin || results.length >= maxResults) {
       return;
     }
 
@@ -103,11 +104,15 @@ export class ComboBacktrackingDomainService {
         context,
       );
 
-      if (partialBound >= bestScore.value - 1) {
+      if (partialBound >= bestScore.value - this.pruneMargin) {
         this.backtrack(roleIndex + 1, groups, current, results, context, bestScore, maxResults);
       }
 
       current.pop();
+    }
+
+    if (!this.requiredRoles.includes(role)) {
+      this.backtrack(roleIndex + 1, groups, current, results, context, bestScore, maxResults);
     }
   }
 

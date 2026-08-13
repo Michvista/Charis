@@ -16,6 +16,7 @@ export interface StyleItemInput {
 
 export interface CompatibilityContext {
   occasionFormality?: number;
+  targetSeason?: string;
 }
 
 export interface CompatibilityBreakdown {
@@ -205,28 +206,68 @@ export class StyleCompatibilityService {
     return score;
   }
 
-  public scoreSeasonCompatibility(items: StyleItemInput[]): number {
-    const seasonBuckets = items
-      .map((item) => (item.seasonTags || []).map((season) => season.toLowerCase()))
-      .filter((tags) => tags.length > 0);
+  public scoreSeasonCompatibility(
+    items: StyleItemInput[],
+    context: CompatibilityContext = {},
+  ): number {
+    const taggedItems = items
+      .map((item) => ({
+        category: this.normalizeRole(item.category).toString(),
+        seasons: (item.seasonTags || [])
+          .map((season) => this.normalizeSeason(season))
+          .filter((season): season is string => Boolean(season)),
+      }))
+      .filter((item) => item.seasons.length > 0);
 
-    if (seasonBuckets.length === 0) {
+    if (taggedItems.length === 0) {
       return 0;
     }
 
-    const common = seasonBuckets.reduce((acc, tags) => {
-      if (acc === null) {
-        return new Set(tags);
-      }
-      return new Set(tags.filter((tag) => acc.has(tag)));
-    }, null as Set<string> | null);
+    const targetSeason = this.normalizeSeason(context.targetSeason);
+    let score = 0;
 
-    if (common && common.size > 0) {
-      return 6;
+    if (targetSeason) {
+      for (const item of taggedItems) {
+        score += this.evaluateSeasonAgainstTarget(
+          item.seasons,
+          targetSeason,
+          item.category === "OUTERWEAR",
+        );
+      }
+    } else {
+      for (let i = 0; i < taggedItems.length; i += 1) {
+        for (let j = i + 1; j < taggedItems.length; j += 1) {
+          const left = taggedItems[i];
+          const right = taggedItems[j];
+          const pairScore = this.evaluateSeasonPair(left.seasons, right.seasons);
+          const weight =
+            left.category === "OUTERWEAR" || right.category === "OUTERWEAR"
+              ? 0.5
+              : 1;
+          score += pairScore * weight;
+        }
+      }
+
+      const counts = new Map<string, number>();
+      for (const item of taggedItems) {
+        for (const season of item.seasons) {
+          counts.set(season, (counts.get(season) || 0) + 1);
+        }
+      }
+
+      const total = taggedItems.reduce((sum, item) => sum + item.seasons.length, 0);
+      const majority = Math.max(...Array.from(counts.values()));
+
+      if (total > 0 && majority / total >= 0.75) {
+        score += 3;
+      } else if (total > 0 && majority / total >= 0.5) {
+        score += 1;
+      } else {
+        score -= 1;
+      }
     }
 
-    const flattened = new Set(seasonBuckets.flat());
-    return flattened.size >= 2 ? 2 : 0;
+    return Math.max(-12, Math.min(12, Math.round(score)));
   }
 
   public scoreCompleteness(
@@ -345,53 +386,31 @@ export class StyleCompatibilityService {
     remainingGroups: Array<{ role: string; items: StyleItemInput[] }>,
     context: CompatibilityContext = {},
   ): number {
-    const currentScore = this.scoreOutfit(currentItems, context).score;
-    let optimisticBonus = 0;
+    const current = this.scoreOutfit(currentItems, context);
+    const currentCount = currentItems.length;
+    const remainingCount = remainingGroups.length;
+    const futurePairs = currentCount * remainingCount + (remainingCount * (remainingCount - 1)) / 2;
+    const currentRoles = new Set(
+      currentItems.map((item) => this.normalizeRole(item.category).toString()),
+    );
+    const missingRequired = this.requiredRoles.filter((role) => !currentRoles.has(role)).length;
 
-    for (const group of remainingGroups) {
-      const bestContribution = group.items.reduce((best, candidate) => {
-        const candidateItem = {
-          ...candidate,
-          category: this.normalizeRole(candidate.category).toString(),
-        };
+    const roleUpper =
+      current.roleScore + futurePairs * 18 + missingRequired * 4 + (missingRequired > 0 ? 10 : 0);
+    const colorUpper = current.colorScore + futurePairs * 18;
+    const formalityUpper = 28;
+    const seasonUpper = 12;
+    const completenessUpper = 40;
 
-        const pairScore = currentItems.reduce((sum, current) => {
-          const currentItem = {
-            ...current,
-            category: this.normalizeRole(current.category).toString(),
-          };
+    const optimisticRaw =
+      8 +
+      roleUpper * 0.25 +
+      colorUpper * 0.35 +
+      formalityUpper * 0.9 +
+      seasonUpper * 1.5 +
+      completenessUpper * 0.6;
 
-          let local = this.compatibilityGraph[candidateItem.category]?.[currentItem.category] ??
-            this.compatibilityGraph[currentItem.category]?.[candidateItem.category] ??
-            0.12;
-          local = local * 18;
-
-          if (candidateItem.colorHex && currentItem.colorHex) {
-            local += Math.max(0, this.evaluateColorPair(candidateItem.colorHex, currentItem.colorHex) * 0.75);
-          }
-
-          return sum + local;
-        }, 0);
-
-        const formalityBonus = typeof context.occasionFormality === "number"
-          ? Math.max(
-              0,
-              14 - Math.abs((candidateItem.formalityLevel ?? context.occasionFormality) - context.occasionFormality) * 4,
-            )
-          : Math.max(0, 10 - Math.abs((candidateItem.formalityLevel ?? 3) - 3) * 2);
-
-        const seasonBonus = candidateItem.seasonTags?.length ? 4 : 0;
-        const structuralBonus = group.role === "ACCESSORY" ? 4 : 8;
-
-        return Math.max(best, pairScore + formalityBonus + seasonBonus + structuralBonus);
-      }, 0);
-
-      optimisticBonus += bestContribution;
-    }
-
-    optimisticBonus += Math.max(0, remainingGroups.length - 1) * 6;
-
-    return this.clampScore(currentScore + optimisticBonus);
+    return this.clampScore(optimisticRaw);
   }
 
   private isNeutral(color: { h: number; s: number; l: number }, raw: string): boolean {
@@ -426,6 +445,89 @@ export class StyleCompatibilityService {
     const b = parseInt(full.slice(4, 6), 16) / 255;
 
     return this.rgbToHsl(r, g, b);
+  }
+
+  private normalizeSeason(raw?: string): string | null {
+    if (!raw) {
+      return null;
+    }
+
+    const normalized = raw.trim().toUpperCase();
+    const aliases: Record<string, string> = {
+      SPRING: "SPRING",
+      SUMMER: "SUMMER",
+      FALL: "FALL",
+      AUTUMN: "FALL",
+      WINTER: "WINTER",
+    };
+
+    return aliases[normalized] || null;
+  }
+
+  private seasonIndex(season: string): number | null {
+    const order = ["SPRING", "SUMMER", "FALL", "WINTER"];
+    const index = order.indexOf(season);
+    return index >= 0 ? index : null;
+  }
+
+  private evaluateSeasonPair(left: string[], right: string[]): number {
+    let best = -3;
+
+    for (const l of left) {
+      for (const r of right) {
+        if (l === r) {
+          return 6;
+        }
+
+        const leftIndex = this.seasonIndex(l);
+        const rightIndex = this.seasonIndex(r);
+        if (leftIndex === null || rightIndex === null) {
+          continue;
+        }
+
+        const diff = Math.abs(leftIndex - rightIndex);
+        const cyclicDiff = Math.min(diff, 4 - diff);
+
+        if (cyclicDiff === 1) {
+          best = Math.max(best, 2);
+        } else if (cyclicDiff === 2) {
+          best = Math.max(best, -3);
+        }
+      }
+    }
+
+    return best;
+  }
+
+  private evaluateSeasonAgainstTarget(
+    seasons: string[],
+    targetSeason: string,
+    outerwear: boolean,
+  ): number {
+    let best = -2;
+
+    for (const season of seasons) {
+      if (season === targetSeason) {
+        return outerwear ? 3 : 6;
+      }
+
+      const seasonIndex = this.seasonIndex(season);
+      const targetIndex = this.seasonIndex(targetSeason);
+      if (seasonIndex === null || targetIndex === null) {
+        continue;
+      }
+
+      const diff = Math.abs(seasonIndex - targetIndex);
+      const cyclicDiff = Math.min(diff, 4 - diff);
+
+      if (cyclicDiff === 1) {
+        best = Math.max(best, outerwear ? 1 : 2);
+      } else if (cyclicDiff === 2) {
+        best = Math.max(best, outerwear ? -1 : -3);
+      }
+    }
+
+    return best;
   }
 
   private namedColorHex(color: string): string | null {

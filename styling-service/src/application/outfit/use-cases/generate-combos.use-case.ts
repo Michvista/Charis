@@ -29,6 +29,7 @@ export class GenerateCombosUseCase implements IUseCase<
 
     const combos = this.algoService.generateCombinations(request.items, {
       occasionFormality: occasion?.formalityLevel,
+      targetSeason: request.targetSeason,
     });
 
     return {

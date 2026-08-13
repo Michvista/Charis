@@ -22,6 +22,7 @@ export interface CombinationResult {
 
 export interface ComboSearchOptions {
   occasionFormality?: number;
+  targetSeason?: string;
   maxResults?: number;
 }
 
@@ -29,45 +30,44 @@ export class ComboBacktrackingDomainService {
   private readonly compatibilityService = new StyleCompatibilityService();
   private readonly requiredRoles = ["TOP", "BOTTOM", "SHOES"];
   private readonly roleOrder = ["TOP", "BOTTOM", "SHOES", "OUTERWEAR", "ACCESSORY"];
-  private readonly pruneMargin = 20;
 
   public generateCombinations(
     items: WardrobeItemInput[],
     options: ComboSearchOptions = {},
   ): CombinationResult[] {
-    const results: CombinationResult[] = [];
+    const topN: CombinationResult[] = [];
     const groups = this.groupByRole(items);
     const current: WardrobeItemInput[] = [];
     const context: CompatibilityContext = {
       occasionFormality: options.occasionFormality,
+      targetSeason: options.targetSeason,
     };
-    const bestScore = { value: Number.NEGATIVE_INFINITY };
+    const maxResults = options.maxResults ?? Number.POSITIVE_INFINITY;
+    const rankThreshold = { value: Number.NEGATIVE_INFINITY };
 
-    this.backtrack(0, groups, current, results, context, bestScore, options.maxResults ?? Number.POSITIVE_INFINITY);
+    this.backtrack(0, groups, current, topN, context, rankThreshold, maxResults);
 
-    return results.sort((a, b) => b.score - a.score);
+    return this.sortTopN(topN);
   }
 
   private backtrack(
     roleIndex: number,
     groups: Map<string, WardrobeItemInput[]>,
     current: WardrobeItemInput[],
-    results: CombinationResult[],
+    topN: CombinationResult[],
     context: CompatibilityContext,
-    bestScore: { value: number },
+    rankThreshold: { value: number },
     maxResults: number,
   ): void {
     if (roleIndex >= this.roleOrder.length) {
       if (this.isValidCombination(current)) {
         const score = this.scoreCombination(current, context);
-        if (score >= bestScore.value) {
-          bestScore.value = score;
-        }
-        results.push({
+        this.insertTopN(topN, {
           comboId: crypto.randomUUID(),
           items: [...current],
           score,
-        });
+        }, maxResults);
+        rankThreshold.value = this.getNthBestScore(topN, maxResults);
       }
       return;
     }
@@ -82,7 +82,7 @@ export class ComboBacktrackingDomainService {
       context,
     );
 
-    if (optimisticUpperBound < bestScore.value - this.pruneMargin || results.length >= maxResults) {
+    if (this.shouldPrune(optimisticUpperBound, rankThreshold.value, topN, maxResults)) {
       return;
     }
 
@@ -91,7 +91,7 @@ export class ComboBacktrackingDomainService {
     }
 
     if (candidates.length === 0) {
-      this.backtrack(roleIndex + 1, groups, current, results, context, bestScore, maxResults);
+      this.backtrack(roleIndex + 1, groups, current, topN, context, rankThreshold, maxResults);
       return;
     }
 
@@ -104,15 +104,15 @@ export class ComboBacktrackingDomainService {
         context,
       );
 
-      if (partialBound >= bestScore.value - this.pruneMargin) {
-        this.backtrack(roleIndex + 1, groups, current, results, context, bestScore, maxResults);
+      if (!this.shouldPrune(partialBound, rankThreshold.value, topN, maxResults)) {
+        this.backtrack(roleIndex + 1, groups, current, topN, context, rankThreshold, maxResults);
       }
 
       current.pop();
     }
 
     if (!this.requiredRoles.includes(role)) {
-      this.backtrack(roleIndex + 1, groups, current, results, context, bestScore, maxResults);
+      this.backtrack(roleIndex + 1, groups, current, topN, context, rankThreshold, maxResults);
     }
   }
 
@@ -157,6 +157,62 @@ export class ComboBacktrackingDomainService {
       items as unknown as StyleItemInput[],
       context,
     ).score;
+  }
+
+  public getTopN(results: CombinationResult[], maxResults: number): CombinationResult[] {
+    return this.sortTopN(results).slice(0, maxResults);
+  }
+
+  private insertTopN(
+    topN: CombinationResult[],
+    candidate: CombinationResult,
+    maxResults: number,
+  ): void {
+    topN.push(candidate);
+    topN.sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+      return left.items.map((item) => item.id).join(",").localeCompare(
+        right.items.map((item) => item.id).join(","),
+      );
+    });
+
+    if (topN.length > maxResults) {
+      topN.pop();
+    }
+  }
+
+  private sortTopN(results: CombinationResult[]): CombinationResult[] {
+    return [...results].sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+      return left.items.map((item) => item.id).join(",").localeCompare(
+        right.items.map((item) => item.id).join(","),
+      );
+    });
+  }
+
+  private getNthBestScore(results: CombinationResult[], maxResults: number): number {
+    if (results.length < maxResults) {
+      return Number.NEGATIVE_INFINITY;
+    }
+
+    return this.sortTopN(results)[Math.min(maxResults, results.length) - 1]?.score ?? Number.NEGATIVE_INFINITY;
+  }
+
+  private shouldPrune(
+    optimisticUpperBound: number,
+    threshold: number,
+    topN: CombinationResult[],
+    maxResults: number,
+  ): boolean {
+    if (topN.length < maxResults) {
+      return false;
+    }
+
+    return optimisticUpperBound < threshold;
   }
 
   private estimateItemPotential(

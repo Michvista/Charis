@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "cloudinary",
     
     # Local domain apps
+    "common.apps.CommonConfig",
     "apps.accounts",
     "apps.wardrobe",
     "apps.tripplanner",
@@ -90,6 +91,7 @@ DATABASES = {
         ssl_require=False if os.getenv("DATABASE_URL", "").startswith("sqlite") else True,
     )
 }
+DJANGO_DB_SCHEMA = os.getenv("DJANGO_DB_SCHEMA", "django")
 
 #   Authentication & DRF                       
 

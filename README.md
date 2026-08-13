@@ -193,10 +193,13 @@ REDIS_URL=redis://localhost:6379
 SECRET_KEY=
 DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
+DJANGO_DB_SCHEMA=django
 
 # DolphJS styling service
 JWT_SECRET=              # same secret as Django — verified on both sides
-STYLING_SERVICE_PORT=3000
+STYLING_SERVICE_URL=http://styling-service:3300
+STYLING_SERVICE_PORT=3300
+DATABASE_SCHEMA=styling_service
 INTERNAL_API_KEY=        # shared secret between job-worker and services
 
 # AI

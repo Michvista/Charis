@@ -60,8 +60,8 @@ class WardrobeItem(models.Model):
         choices=TAGGING_STATUS_CHOICES,
         default="pending"
     )
-    # Denormalized counter derived from WearLog
-    # Updated by the job-worker after each wear log, not manually
+    # Denormalized counter derived from WearLog.
+    # Updated synchronously in the wardrobe service to keep it atomic with the log write.
     times_worn = models.IntegerField(default=0)
     purchase_price = models.DecimalField(
         max_digits=10, decimal_places=2, blank=True, null=True

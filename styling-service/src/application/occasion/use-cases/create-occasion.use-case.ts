@@ -6,6 +6,7 @@ import { IOccasionRepository } from "../../../domain/occasion/repositories/occas
 import { Occasion } from "../../../domain/occasion/entities/occasion.domain-entity";
 import { OccasionDtoMapper } from "../mappers/occasion-dto.mapper";
 import { Result } from "../../../shared/domain/result";
+import { FormalityLevel } from "../../../domain/occasion/value-objects/formality-level.vo";
 
 export class CreateOccasionUseCase implements IUseCase<
   CreateOccasionDTO,
@@ -23,9 +24,14 @@ export class CreateOccasionUseCase implements IUseCase<
       );
     }
 
+    const formalityLevel = FormalityLevel.create(request.formalityLevel);
+    if (formalityLevel.isFailure) {
+      return Result.fail<OccasionResponseDTO>(formalityLevel.error || "Invalid formality level.");
+    }
+
     const occasion = Occasion.create({
       name: request.name,
-      formalityLevel: request.formalityLevel,
+      formalityLevel: formalityLevel.getValue().value,
     });
 
     const saved = await this.occasionRepo.save(occasion);

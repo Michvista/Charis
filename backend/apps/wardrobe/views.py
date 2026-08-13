@@ -1,17 +1,17 @@
-
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
+from django.db.models import F
 
 from common.permissions import IsOwner
 from common.pagination import StandardResultsSetPagination
 
 from .models import WardrobeItem, WearLog
-from .serializers import WardrobeItemSerializer
-from .services import upload_image_to_cloudinary, enqueue_tagging_job
+from .serializers import WardrobeItemSerializer, WearLogSerializer
+from .services import upload_image_to_cloudinary, enqueue_tagging_job, StylingServiceClient
 
 
 class WardrobeItemViewSet(viewsets.ModelViewSet):
@@ -33,7 +33,7 @@ class WardrobeItemViewSet(viewsets.ModelViewSet):
         if image_file:
             image_url = upload_image_to_cloudinary(image_file)
 
-        #Save the item with the user and Cloudinary image URL
+        # Save the item with the user and Cloudinary image URL
         item = serializer.save(user=self.request.user, image_url=image_url)
 
         # Call service layer stub to enqueue auto-tagging
@@ -41,21 +41,55 @@ class WardrobeItemViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='wear')
     def log_wear(self, request, pk=None):
-    
-       # Logs a wear entry for today for this specific item.
-    
+        """
+        POST /api/wardrobe/items/<id>/wear/
+        Logs a wear entry for today. Optionally accepts {"outfit_id": "uuid"} in request body.
+        """
         item = self.get_object()  # Enforces user ownership via get_queryset & IsOwner
-        
+        outfit_id = request.data.get("outfit_id")
+
         wear_log = WearLog.objects.create(
             wardrobe_item=item,
+            outfit_id=outfit_id,
             worn_date=timezone.now().date()
         )
+
+        item.times_worn = F("times_worn") + 1
+        item.save(update_fields=["times_worn"])
 
         return Response(
             {
                 "message": f"Logged wear for '{item.name}'",
                 "wear_log_id": str(wear_log.id),
+                "outfit_id": str(wear_log.outfit_id) if wear_log.outfit_id else None,
                 "worn_date": str(wear_log.worn_date)
             },
             status=status.HTTP_201_CREATED
         )
+
+
+class WearLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    GET /api/wardrobe/wear-logs/
+    GET /api/wardrobe/wear-logs/<id>/
+    Fetches wear logs and enriches single detail queries with DolphJS outfit analytics.
+    """
+    serializer_class = WearLogSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+
+    def get_queryset(self):
+        return WearLog.objects.filter(wardrobe_item__user=self.request.user)
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        data = serializer.data
+
+        # Cross-service query to DolphJS styling-service
+        if instance.outfit_id:
+            data["outfit_analytics"] = StylingServiceClient.get_outfit_by_id(str(instance.outfit_id))
+        else:
+            data["outfit_analytics"] = None
+
+        return Response(data)

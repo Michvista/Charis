@@ -1,0 +1,69 @@
+import { DolphControllerHandler } from "@dolphjs/dolph/classes";
+import { Dolph, SuccessResponse } from "@dolphjs/dolph/common";
+import {
+  Route,
+  Post,
+  Get,
+  DBody,
+  DParam,
+  DRes,
+  Shield,
+  UnShield,
+  DReq,
+} from "@dolphjs/dolph/decorators";
+import { TypeOrmOutfitRepository } from "../../../infrastructure/database/typeorm/repositories/typeorm-outfit.repository";
+import { EvaluateVerdictUseCase } from "../../../application/outfit/use-cases/evaluate-verdict.use-case";
+import { authShield } from "../shields/auth.shield";
+
+@Shield(authShield)
+@Route("verdict")
+export class VerdictController extends DolphControllerHandler<Dolph> {
+  private evaluateUseCase: EvaluateVerdictUseCase;
+  private outfitRepo: TypeOrmOutfitRepository;
+
+  constructor() {
+    super();
+    this.outfitRepo = new TypeOrmOutfitRepository();
+    this.evaluateUseCase = new EvaluateVerdictUseCase(this.outfitRepo);
+  }
+
+  @Post()
+  async evaluateOutfit(@DBody() body: any, @DReq() req: any, @DRes() res: any) {
+    const userId = req.payload?.id || body.userId || "mock-user-uuid-1234";
+
+    const dto = {
+      userId,
+      occasionId: body.occasionId,
+      items: body.items || [],
+    };
+
+    const result = await this.evaluateUseCase.execute(dto);
+
+    SuccessResponse({ res, body: result, status: 201 });
+  }
+
+  @UnShield([])
+  @Get(":id")
+  async getOutfitById(@DParam("id") id: string, @DRes() res: any) {
+    const outfit = await this.outfitRepo.findById(id);
+
+    if (!outfit) {
+      return res
+        .status(404)
+        .json({ status: "fail", message: "Outfit not found" });
+    }
+
+    const data = {
+      outfitId: outfit.id,
+      userId: outfit.userId,
+      score: outfit.compatibilityScore,
+      verdictText: outfit.verdictText,
+      items: outfit.items.map((i) => ({
+        wardrobeItemId: i.wardrobeItemId,
+        itemRole: i.itemRole,
+      })),
+    };
+
+    SuccessResponse({ res, body: data });
+  }
+}

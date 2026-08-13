@@ -60,7 +60,7 @@ class WardrobeItem(models.Model):
         choices=TAGGING_STATUS_CHOICES,
         default="pending"
     )
-    # Denormalized counter — derived from WearLog
+    # Denormalized counter derived from WearLog
     # Updated by the job-worker after each wear log, not manually
     times_worn = models.IntegerField(default=0)
     purchase_price = models.DecimalField(
@@ -84,9 +84,9 @@ class WearLog(models.Model):
         on_delete=models.CASCADE,
         related_name="wear_logs"
     )
-    # nullable — not every wear is part of a saved outfit
+    # nullable not every wear is part of a saved outfit
     # outfit_id here is the UUID from the DolphJS styling-service
-    # stored as a plain UUID string — no FK across services
+    # stored as a plain UUID string no FK across services
     outfit_id = models.UUIDField(blank=True, null=True)
     worn_date = models.DateField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -1,0 +1,47 @@
+{
+  "exclude": ["node_modules"],
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0",
+    "allowJs": false,
+    "skipLibCheck": true,
+    "declaration": false,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "sourceMap": false,
+    "useUnknownInCatchVariables": false,
+    "strictFunctionTypes": false,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "target": "ES2022",
+    "baseUrl": ".",
+    "rootDir": "src",
+    "outDir": "app",
+    "pretty": true,
+    "module": "commonjs",
+    "paths": {
+      "@/*": ["./src/*"],
+      "bullmq": ["./src/bullmq"],
+      "@dolphjs/core": ["./src/@dolphjs/core"],
+      "@dolphjs/dolph": ["./src/@dolphjs/dolph"],
+      "@/configs/*": ["./src/shared/configs/*"],
+      "@/components/*": ["./src/components/*"],
+      "@utils/*": ["./src/shared/utils/*"],
+      "@shields/*": ["./src/shared/shields/*"],
+      "@shared/*": ["./src/shared/*"],
+      "@/helpers*": ["./src/shared/helpers/*"],
+      "@/interfaces/*": ["./src/shared/interfaces/*"],
+      "@/middlewares/*": ["./src/shared/middlewares/*"],
+      "@/decorators/*": ["./src/shared/decorators/*"],
+      "@/services/*": ["./src/shared/services/*"],
+      "@/constants/*": ["./src/shared/constants/*"],
+      "@/validations/*": ["./src/shared/validations/*"]
+    }
+  },
+  "include": ["src/", ".env"],
+  "ts-node": {
+    "compilerOptions": {
+      "module": "CommonJS"
+    }
+  }
+}

@@ -68,7 +68,7 @@ frontend poll resolves → renders verdict
 | Layer | Technology |
 |---|---|
 | Core backend | Python · Django · Django REST Framework |
-| Styling service | TypeScript · DolphJS · Prisma |
+| Styling service | TypeScript · DolphJS · TypeORM |
 | Async jobs | Node · BullMQ · Redis |
 | Frontend | React · Vite · TypeScript |
 | Animations | Framer Motion |
@@ -111,7 +111,7 @@ charis/
 │       ├── analytics/              # Aggregations (no new models)
 │       └── styleadvisor/           # RAG: StyleKnowledgeChunk, ShoppingSuggestion
 ├── styling-service/                # DolphJS
-│   ├── prisma/schema.prisma        # Occasion, Outfit, OutfitItem
+│   ├── src/                        # TypeORM entities and migrations
 │   └── src/
 │       ├── server.ts
 │       ├── shared/                 # Auth guard, decorators, filters
@@ -161,7 +161,7 @@ python manage.py runserver
 # 5. Run DolphJS styling service
 cd ../styling-service
 npm install
-npx prisma migrate dev
+npm run build
 npm run dev:start
 
 # 6. Run job worker

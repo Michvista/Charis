@@ -1,5 +1,7 @@
 import cloudinary.uploader
+import requests
 from typing import Any
+from django.conf import settings
 
 
 def upload_image_to_cloudinary(file: Any) -> str:
@@ -13,5 +15,24 @@ def upload_image_to_cloudinary(file: Any) -> str:
 
 def enqueue_tagging_job(item_id: str) -> None:
     """Queue stub for AI auto-tagging."""
-    # Currently logs to console. In Week 2, this will push to Redis / BullMQ.
     print(f"[QUEUE STUB] Enqueuing auto-tagging job for item ID: {item_id}", flush=True)
+
+
+class StylingServiceClient:
+    """HTTP Client responsible for making cross-service calls to DolphJS Styling Service."""
+    BASE_URL = getattr(settings, "STYLING_SERVICE_URL", "http://localhost:3300")
+
+    @classmethod
+    def get_outfit_by_id(cls, outfit_id: str) -> dict | None:
+        """Calls DolphJS GET /verdict/:id endpoint using the stored outfit_id UUID."""
+        try:
+            url = f"{cls.BASE_URL}/verdict/{outfit_id}"
+            response = requests.get(url, timeout=3.0)
+
+            if response.status_code == 200:
+                body = response.json()
+                return body.get("body") or body.get("data")
+            return None
+        except requests.RequestException as e:
+            print(f"[Django] Failed to fetch outfit from DolphJS styling-service: {e}")
+            return None

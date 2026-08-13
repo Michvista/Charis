@@ -1,0 +1,37 @@
+{
+  "name": "charis-styling-service",
+  "version": "1.0.0",
+  "main": "app/server.js",
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "dev:start": "dolph watch",
+    "dev:docker:start": "docker-compose -f docker-compose-dev.yml up",
+    "dev:docker:stop": "docker-compose -f docker-compose-dev.yml down",
+    "build": "dolph build",
+    "build:tsc": "tsc && tsc-alias",
+    "start": "dolph start",
+    "clean": "rm -r app && rm -r logs"
+  },
+  "dependencies": {
+    "@dolphjs/dolph": "^1.4.3",
+    "bullmq": "^6.1.0",
+    "pg": "^8.23.0",
+    "reflect-metadata": "^0.2.2",
+    "typeorm": "^1.1.0"
+  },
+  "devDependencies": {
+    "@swc/cli": "^0.1.65",
+    "@swc/core": "^1.15.47",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20.8.2",
+    "ts-node": "^10.9.1",
+    "tsc-alias": "^1.8.8",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^6.0.3"
+  }
+}

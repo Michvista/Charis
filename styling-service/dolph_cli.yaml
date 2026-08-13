@@ -1,0 +1,7 @@
+# this is an auto-generated file, please do not edit manually
+language: ts
+paradigm: oop
+database: postgresql
+generateFolder: true
+routing: spring
+api: rest

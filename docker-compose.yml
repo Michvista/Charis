@@ -30,22 +30,22 @@ services:
       redis:
         condition: service_healthy
 
-  # # Styling Service (DolphJS)
-  # styling-service:
-  #   build:
-  #     context: ./styling-service
-  #     dockerfile: Dockerfile
-  #   container_name: charis_styling
-  #   volumes:
-  #     - ./styling-service:/app
-  #     - /app/node_modules
-  #   ports:
-  #     - "3000:3000"
-  #   env_file:
-  #     - .env
-  #   depends_on:
-  #     redis:
-  #       condition: service_healthy
+  # Styling Service (DolphJS)
+  styling-service:
+    build:
+      context: ./styling-service
+      dockerfile: Dockerfile
+    container_name: charis_styling
+    volumes:
+      - ./styling-service:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
 
   # # Job Worker (BullMQ)
   # job-worker:

@@ -32,6 +32,11 @@ export class OutfitPersistenceMapper {
     orm.userId = domainAggregate.userId;
     orm.compatibilityScore = domainAggregate.compatibilityScore;
     orm.verdictText = domainAggregate.verdictText || "";
+    orm.occasion = domainAggregate.occasionId
+      ? ({
+          id: domainAggregate.occasionId,
+        } as any)
+      : null;
 
     orm.items = domainAggregate.items.map((item) => {
       const itemOrm = new OutfitItemOrmEntity();

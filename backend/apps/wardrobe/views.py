@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
 from django.db.models import F
+from rest_framework.exceptions import ValidationError
 
 from common.permissions import IsOwner
 from common.pagination import StandardResultsSetPagination
@@ -47,6 +48,21 @@ class WardrobeItemViewSet(viewsets.ModelViewSet):
         """
         item = self.get_object()  # Enforces user ownership via get_queryset & IsOwner
         outfit_id = request.data.get("outfit_id")
+
+        if outfit_id:
+            outfit = StylingServiceClient.get_outfit_by_id(str(outfit_id))
+            if not outfit:
+                return Response(
+                    {"detail": "Outfit not found in styling service."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            outfit_user_id = outfit.get("userId")
+            if outfit_user_id != str(request.user.id):
+                return Response(
+                    {"detail": "You do not own this outfit."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
         wear_log = WearLog.objects.create(
             wardrobe_item=item,

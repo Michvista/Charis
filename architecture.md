@@ -77,7 +77,6 @@ DolphJS Spring mode = OOP controllers + TypeScript decorators. Each component fo
 
 ```
 styling-service/
-├── prisma/schema.prisma     # Occasion, Outfit, OutfitItem models (Prisma)
 ├── dolph_config.yaml        # DolphJS app config (port, cors, db)
 └── src/
     ├── server.ts            # app bootstrap
@@ -155,6 +154,6 @@ frontend/
 
 **Django (backend/):** User · WardrobeItem · WearLog · Season · Trip · TripEvent · PackingList · PackingListItem · OutfitShare · Comment · Vote · StyleKnowledgeChunk · ShoppingSuggestion
 
-**DolphJS/Prisma (styling-service/):** Occasion · Outfit · OutfitItem
+**DolphJS/TypeORM (styling-service/):** Occasion · Outfit · OutfitItem
 
 **job-worker:** No models — stateless processor, reads/writes via API calls only

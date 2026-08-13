@@ -16,7 +16,14 @@ export class CombosController extends DolphControllerHandler<Dolph> {
 
   @Post()
   async generateCombos(@DBody() body: any, @DReq() req: any, @DRes() res: any) {
-    const userId = req.payload?.id || body.userId || 'anonymous';
+    const userId = req.payload?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        status: 'fail',
+        message: 'Unauthorized: missing authenticated user',
+      });
+    }
 
     const dto = {
       userId,

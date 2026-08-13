@@ -8,10 +8,10 @@ import {
   DParam,
   DRes,
   Shield,
-  UnShield,
   DReq,
 } from "@dolphjs/dolph/decorators";
 import { TypeOrmOutfitRepository } from "../../../infrastructure/database/typeorm/repositories/typeorm-outfit.repository";
+import { TypeOrmOccasionRepository } from "../../../infrastructure/database/typeorm/repositories/typeorm-occasion.repository";
 import { EvaluateVerdictUseCase } from "../../../application/outfit/use-cases/evaluate-verdict.use-case";
 import { authShield } from "../shields/auth.shield";
 
@@ -20,16 +20,28 @@ import { authShield } from "../shields/auth.shield";
 export class VerdictController extends DolphControllerHandler<Dolph> {
   private evaluateUseCase: EvaluateVerdictUseCase;
   private outfitRepo: TypeOrmOutfitRepository;
+  private occasionRepo: TypeOrmOccasionRepository;
 
   constructor() {
     super();
     this.outfitRepo = new TypeOrmOutfitRepository();
-    this.evaluateUseCase = new EvaluateVerdictUseCase(this.outfitRepo);
+    this.occasionRepo = new TypeOrmOccasionRepository();
+    this.evaluateUseCase = new EvaluateVerdictUseCase(
+      this.outfitRepo,
+      this.occasionRepo,
+    );
   }
 
   @Post()
   async evaluateOutfit(@DBody() body: any, @DReq() req: any, @DRes() res: any) {
-    const userId = req.payload?.id || body.userId || "mock-user-uuid-1234";
+    const userId = req.payload?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        status: "fail",
+        message: "Unauthorized: missing authenticated user",
+      });
+    }
 
     const dto = {
       userId,
@@ -42,7 +54,6 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
     SuccessResponse({ res, body: result, status: 201 });
   }
 
-  @UnShield([])
   @Get(":id")
   async getOutfitById(@DParam("id") id: string, @DRes() res: any) {
     const outfit = await this.outfitRepo.findById(id);

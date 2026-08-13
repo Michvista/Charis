@@ -107,6 +107,7 @@ SIMPLE_JWT = {
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
+    "SIGNING_KEY": os.getenv("JWT_SECRET", SECRET_KEY),
 }
 
 #   CORS                               
@@ -119,6 +120,11 @@ CORS_ALLOWED_ORIGINS = [
 #   Redis                              ─
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+STYLING_SERVICE_URL = os.getenv("STYLING_SERVICE_URL", "http://localhost:3300")
+STYLING_SERVICE_INTERNAL_TOKEN = os.getenv(
+    "STYLING_SERVICE_INTERNAL_TOKEN",
+    os.getenv("INTERNAL_API_KEY", ""),
+)
 
 #   Password Validation & Defaults                 ─
 

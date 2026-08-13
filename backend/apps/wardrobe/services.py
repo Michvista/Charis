@@ -20,18 +20,22 @@ def enqueue_tagging_job(item_id: str) -> None:
 
 class StylingServiceClient:
     """HTTP Client responsible for making cross-service calls to DolphJS Styling Service."""
-    BASE_URL = getattr(settings, "STYLING_SERVICE_URL", "http://localhost:3300")
+    BASE_URL = getattr(settings, "STYLING_SERVICE_URL", "http://styling-service:3300")
+    INTERNAL_TOKEN = getattr(settings, "STYLING_SERVICE_INTERNAL_TOKEN", "")
 
     @classmethod
     def get_outfit_by_id(cls, outfit_id: str) -> dict | None:
         """Calls DolphJS GET /verdict/:id endpoint using the stored outfit_id UUID."""
         try:
             url = f"{cls.BASE_URL}/verdict/{outfit_id}"
-            response = requests.get(url, timeout=3.0)
+            headers = {}
+            if cls.INTERNAL_TOKEN:
+                headers["Authorization"] = f"Bearer {cls.INTERNAL_TOKEN}"
+            response = requests.get(url, headers=headers, timeout=3.0)
 
             if response.status_code == 200:
                 body = response.json()
-                return body.get("body") or body.get("data")
+                return body.get("body") or body.get("data") or body
             return None
         except requests.RequestException as e:
             print(f"[Django] Failed to fetch outfit from DolphJS styling-service: {e}")

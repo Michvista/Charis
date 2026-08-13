@@ -36,7 +36,7 @@ export class EvaluateVerdictUseCase implements IUseCase<
     }
 
     const evaluation = this.graphService.evaluateOutfit({
-      itemIds: request.items.map((i) => i.wardrobeItemId),
+      itemRoles: request.items.map((i) => i.itemRole),
       occasionFormality: occasion.formalityLevel,
     });
 

@@ -18,6 +18,10 @@ def enqueue_tagging_job(item_id: str) -> None:
     print(f"[QUEUE STUB] Enqueuing auto-tagging job for item ID: {item_id}", flush=True)
 
 
+class StylingServiceUnavailable(Exception):
+    """Raised when the styling service cannot be reached."""
+
+
 class StylingServiceClient:
     """HTTP Client responsible for making cross-service calls to DolphJS Styling Service."""
     BASE_URL = getattr(settings, "STYLING_SERVICE_URL", "http://styling-service:3300")
@@ -36,7 +40,12 @@ class StylingServiceClient:
             if response.status_code == 200:
                 body = response.json()
                 return body.get("body") or body.get("data") or body
-            return None
+            if response.status_code == 404:
+                return None
+            raise StylingServiceUnavailable(
+                f"Unexpected response from styling-service: {response.status_code}"
+            )
         except requests.RequestException as e:
-            print(f"[Django] Failed to fetch outfit from DolphJS styling-service: {e}")
-            return None
+            raise StylingServiceUnavailable(
+                f"Failed to fetch outfit from DolphJS styling-service: {e}"
+            ) from e

@@ -55,13 +55,22 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
   }
 
   @Get(":id")
-  async getOutfitById(@DParam("id") id: string, @DRes() res: any) {
+  async getOutfitById(@DParam("id") id: string, @DReq() req: any, @DRes() res: any) {
     const outfit = await this.outfitRepo.findById(id);
 
     if (!outfit) {
       return res
         .status(404)
         .json({ status: "fail", message: "Outfit not found" });
+    }
+
+    const payloadId = req.payload?.id;
+    const isInternalRequest = payloadId === "internal-service";
+
+    if (!isInternalRequest && payloadId !== outfit.userId) {
+      return res
+        .status(403)
+        .json({ status: "fail", message: "Forbidden: outfit does not belong to this user" });
     }
 
     const data = {

@@ -9,6 +9,7 @@ import { OutfitItemOrmEntity } from "./entities/outfit-item.orm-entity";
 export const AppDataSource = new DataSource({
   type: "postgres",
   url: process.env.DATABASE_URL,
+  schema: process.env.DATABASE_SCHEMA || "styling_service",
   ssl:
     process.env.NODE_ENV === "production" ||
     process.env.DATABASE_URL?.includes("neon.tech")

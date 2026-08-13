@@ -5,14 +5,20 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
 from django.db.models import F
-from rest_framework.exceptions import ValidationError
+from django.db import transaction
+import uuid
 
 from common.permissions import IsOwner
 from common.pagination import StandardResultsSetPagination
 
 from .models import WardrobeItem, WearLog
 from .serializers import WardrobeItemSerializer, WearLogSerializer
-from .services import upload_image_to_cloudinary, enqueue_tagging_job, StylingServiceClient
+from .services import (
+    upload_image_to_cloudinary,
+    enqueue_tagging_job,
+    StylingServiceClient,
+    StylingServiceUnavailable,
+)
 
 
 class WardrobeItemViewSet(viewsets.ModelViewSet):
@@ -50,28 +56,44 @@ class WardrobeItemViewSet(viewsets.ModelViewSet):
         outfit_id = request.data.get("outfit_id")
 
         if outfit_id:
-            outfit = StylingServiceClient.get_outfit_by_id(str(outfit_id))
-            if not outfit:
+            try:
+                uuid.UUID(str(outfit_id))
+            except ValueError:
                 return Response(
-                    {"detail": "Outfit not found in styling service."},
+                    {"detail": "Invalid outfit_id format."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            outfit_user_id = outfit.get("userId")
-            if outfit_user_id != str(request.user.id):
-                return Response(
-                    {"detail": "You do not own this outfit."},
-                    status=status.HTTP_403_FORBIDDEN,
+        try:
+            with transaction.atomic():
+                if outfit_id:
+                    outfit = StylingServiceClient.get_outfit_by_id(str(outfit_id))
+                    if not outfit:
+                        return Response(
+                            {"detail": "Outfit not found in styling service."},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+
+                    outfit_user_id = outfit.get("userId")
+                    if outfit_user_id != str(request.user.id):
+                        return Response(
+                            {"detail": "You do not own this outfit."},
+                            status=status.HTTP_403_FORBIDDEN,
+                        )
+
+                wear_log = WearLog.objects.create(
+                    wardrobe_item=item,
+                    outfit_id=outfit_id,
+                    worn_date=timezone.now().date()
                 )
 
-        wear_log = WearLog.objects.create(
-            wardrobe_item=item,
-            outfit_id=outfit_id,
-            worn_date=timezone.now().date()
-        )
-
-        item.times_worn = F("times_worn") + 1
-        item.save(update_fields=["times_worn"])
+                item.times_worn = F("times_worn") + 1
+                item.save(update_fields=["times_worn"])
+        except StylingServiceUnavailable as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         return Response(
             {
@@ -104,7 +126,13 @@ class WearLogViewSet(viewsets.ReadOnlyModelViewSet):
 
         # Cross-service query to DolphJS styling-service
         if instance.outfit_id:
-            data["outfit_analytics"] = StylingServiceClient.get_outfit_by_id(str(instance.outfit_id))
+            try:
+                data["outfit_analytics"] = StylingServiceClient.get_outfit_by_id(str(instance.outfit_id))
+            except StylingServiceUnavailable as exc:
+                return Response(
+                    {"detail": str(exc)},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
         else:
             data["outfit_analytics"] = None
 

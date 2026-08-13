@@ -43,6 +43,7 @@ export class OutfitPersistenceMapper {
       itemOrm.id = item.id;
       itemOrm.wardrobeItemId = item.wardrobeItemId;
       itemOrm.itemRole = item.itemRole;
+      itemOrm.outfit = orm;
       return itemOrm;
     });
 

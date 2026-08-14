@@ -10,6 +10,7 @@ export class OutfitDtoMapper {
       status: outfit.status === "pending" ? "processing" : outfit.status,
       score: outfit.compatibilityScore,
       verdictText: outfit.verdictText || "",
+      rankedCombos: outfit.rankedCombos,
     };
   }
 }

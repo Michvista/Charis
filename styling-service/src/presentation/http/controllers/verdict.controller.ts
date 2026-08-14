@@ -77,6 +77,7 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
     let compatibilityScore = outfit.compatibilityScore;
     let verdictText = outfit.verdictText || "";
     let status: "pending" | "done" | "failed" = body.status || "done";
+    let rankedCombos = outfit.rankedCombos;
 
     if (body.aiVerdict) {
       compatibilityScore = Number(body.aiVerdict.confidence) || 0;
@@ -87,6 +88,7 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
         compatibilityScore = Number(bestCombo.finalScore ?? bestCombo.score ?? 0);
         verdictText = bestCombo.visualNotes || "Combo generation complete.";
       }
+      rankedCombos = body.combos.slice(0, 3);
     }
 
     const completedOutfit = Outfit.create({
@@ -95,6 +97,7 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
       compatibilityScore,
       verdictText,
       status,
+      rankedCombos,
       items: outfit.items.map((item) =>
         OutfitItem.create(
           {
@@ -135,6 +138,7 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
       status: outfit.status,
       score: outfit.compatibilityScore,
       verdictText: outfit.verdictText,
+      rankedCombos: outfit.rankedCombos,
       items: outfit.items.map((i) => ({
         wardrobeItemId: i.wardrobeItemId,
         itemRole: i.itemRole,

@@ -33,6 +33,9 @@ export class OutfitOrmEntity {
   @Column({ type: "varchar", length: 20, default: "pending" })
   status!: string;
 
+  @Column({ type: "jsonb", nullable: true })
+  rankedCombos?: unknown[];
+
   @OneToMany(() => OutfitItemOrmEntity, (item) => item.outfit, {
     cascade: true,
   })

@@ -79,12 +79,13 @@ export function startComboWorker(): Worker<ComboJobData> {
       }
 
       reranked.sort((left, right) => right.finalScore - left.finalScore);
+      const topRecommendations = reranked.slice(0, 3);
 
       await sendJson(
         `${process.env.STYLING_SERVICE_INTERNAL_URL || "http://localhost:3000"}/outfits/${outfitId}/complete`,
         "PATCH",
         {
-          combos: reranked,
+          combos: topRecommendations,
           status: "done",
         },
         {

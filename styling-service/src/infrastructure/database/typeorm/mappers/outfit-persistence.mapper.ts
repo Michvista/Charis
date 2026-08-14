@@ -21,6 +21,9 @@ export class OutfitPersistenceMapper {
         compatibilityScore: ormEntity.compatibilityScore,
         verdictText: ormEntity.verdictText,
         status: ormEntity.status as "pending" | "done" | "failed",
+        rankedCombos: Array.isArray(ormEntity.rankedCombos)
+          ? (ormEntity.rankedCombos as any[])
+          : [],
         items,
       },
       ormEntity.id,
@@ -34,6 +37,7 @@ export class OutfitPersistenceMapper {
     orm.compatibilityScore = domainAggregate.compatibilityScore;
     orm.verdictText = domainAggregate.verdictText || "";
     orm.status = domainAggregate.status;
+    orm.rankedCombos = domainAggregate.rankedCombos || [];
     orm.occasion = domainAggregate.occasionId
       ? ({
           id: domainAggregate.occasionId,

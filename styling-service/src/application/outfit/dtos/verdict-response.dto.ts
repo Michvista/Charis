@@ -18,4 +18,20 @@ export interface VerdictResponseDTO {
   status: "processing" | "done" | "failed";
   score?: number;
   verdictText?: string;
+  rankedCombos?: Array<{
+    comboId?: string;
+    items: Array<{
+      id: string;
+      category: string;
+      colorHex: string;
+      formalityLevel?: number;
+      seasonTags?: string[];
+      imageUrl?: string;
+    }>;
+    score: number;
+    finalScore?: number;
+    visualScore?: number;
+    visualNotes?: string;
+    confirmed?: boolean;
+  }>;
 }

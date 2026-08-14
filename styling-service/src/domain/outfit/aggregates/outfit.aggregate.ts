@@ -3,12 +3,30 @@
 import { AggregateRoot } from "../../../shared/domain/aggregate-root.base";
 import { OutfitItem } from "../entities/outfit-item.domain-entity";
 
+export interface RankedComboSummary {
+  comboId?: string;
+  items: Array<{
+    id: string;
+    category: string;
+    colorHex: string;
+    formalityLevel?: number;
+    seasonTags?: string[];
+    imageUrl?: string;
+  }>;
+  score: number;
+  finalScore?: number;
+  visualScore?: number;
+  visualNotes?: string;
+  confirmed?: boolean;
+}
+
 export interface OutfitProps {
   userId: string;
   occasionId?: string;
   compatibilityScore: number;
   verdictText?: string;
   status: "pending" | "done" | "failed";
+  rankedCombos?: RankedComboSummary[];
   items: OutfitItem[];
 }
 
@@ -27,6 +45,9 @@ export class Outfit extends AggregateRoot<OutfitProps> {
   }
   get status(): "pending" | "done" | "failed" {
     return this.props.status;
+  }
+  get rankedCombos(): RankedComboSummary[] {
+    return this.props.rankedCombos || [];
   }
   get items(): OutfitItem[] {
     return this.props.items;

@@ -16,14 +16,11 @@ export class GenerateCombosUseCase implements IUseCase<
   GenerateCombosDTO,
   GenerateCombosResponseDTO
 > {
-  private publisher: BullMQPublisher;
-
   constructor(
     private outfitRepo: IOutfitRepository,
-    private occasionRepo?: IOccasionRepository,
-  ) {
-    this.publisher = new BullMQPublisher();
-  }
+    private occasionRepo: IOccasionRepository | undefined,
+    private publisher: BullMQPublisher,
+  ) {}
 
   async execute(request: GenerateCombosDTO): Promise<GenerateCombosResponseDTO> {
     const occasion = request.occasionId && this.occasionRepo

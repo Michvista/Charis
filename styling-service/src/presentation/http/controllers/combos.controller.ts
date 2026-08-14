@@ -5,6 +5,7 @@ import { GenerateCombosDTO } from '../../../application/outfit/dtos/generate-com
 import { GenerateCombosUseCase } from '../../../application/outfit/use-cases/generate-combos.use-case';
 import { TypeOrmOutfitRepository } from '../../../infrastructure/database/typeorm/repositories/typeorm-outfit.repository';
 import { TypeOrmOccasionRepository } from '../../../infrastructure/database/typeorm/repositories/typeorm-occasion.repository';
+import { BullMQPublisher } from '../../../infrastructure/queue/bullmq-combos.publisher';
 import { ComboBacktrackingDomainService } from '../../../domain/combos/domain-services/combo-backtracking.service';
 import { authShield } from '../shields/auth.shield';
 
@@ -17,9 +18,10 @@ export class CombosController extends DolphControllerHandler<Dolph> {
   constructor(
     outfitRepo: TypeOrmOutfitRepository,
     occasionRepo: TypeOrmOccasionRepository,
+    publisher: BullMQPublisher,
   ) {
     super();
-    this.generateUseCase = new GenerateCombosUseCase(outfitRepo, occasionRepo);
+    this.generateUseCase = new GenerateCombosUseCase(outfitRepo, occasionRepo, publisher);
     this.comboService = new ComboBacktrackingDomainService();
   }
 

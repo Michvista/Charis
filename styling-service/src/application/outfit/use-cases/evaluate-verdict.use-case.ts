@@ -16,14 +16,11 @@ export class EvaluateVerdictUseCase implements IUseCase<
   EvaluateVerdictDTO,
   VerdictResponseDTO
 > {
-  private publisher: BullMQPublisher;
-
   constructor(
     private outfitRepo: IOutfitRepository,
     private occasionRepo: IOccasionRepository,
-  ) {
-    this.publisher = new BullMQPublisher();
-  }
+    private publisher: BullMQPublisher,
+  ) {}
 
   async execute(request: EvaluateVerdictDTO): Promise<VerdictResponseDTO> {
     if (!request.occasionId) {

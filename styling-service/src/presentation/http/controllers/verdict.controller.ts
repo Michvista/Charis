@@ -14,6 +14,7 @@ import {
 import { EvaluateVerdictDTO } from "../../../application/outfit/dtos/verdict-response.dto";
 import { TypeOrmOutfitRepository } from "../../../infrastructure/database/typeorm/repositories/typeorm-outfit.repository";
 import { TypeOrmOccasionRepository } from "../../../infrastructure/database/typeorm/repositories/typeorm-occasion.repository";
+import { BullMQPublisher } from "../../../infrastructure/queue/bullmq-combos.publisher";
 import { EvaluateVerdictUseCase } from "../../../application/outfit/use-cases/evaluate-verdict.use-case";
 import { Outfit } from "../../../domain/outfit/aggregates/outfit.aggregate";
 import { OutfitItem } from "../../../domain/outfit/entities/outfit-item.domain-entity";
@@ -27,13 +28,18 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
   private outfitRepo: TypeOrmOutfitRepository;
   private occasionRepo: TypeOrmOccasionRepository;
 
-  constructor(outfitRepo: TypeOrmOutfitRepository, occasionRepo: TypeOrmOccasionRepository) {
+  constructor(
+    outfitRepo: TypeOrmOutfitRepository,
+    occasionRepo: TypeOrmOccasionRepository,
+    publisher: BullMQPublisher,
+  ) {
     super();
     this.outfitRepo = outfitRepo;
     this.occasionRepo = occasionRepo;
     this.evaluateUseCase = new EvaluateVerdictUseCase(
       this.outfitRepo,
       this.occasionRepo,
+      publisher,
     );
   }
 

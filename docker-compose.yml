@@ -1,18 +1,4 @@
 services:
-  # Infrastructure
-  redis:
-    image: redis:7-alpine
-    container_name: charis_redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   # Backend (Django)
   backend:
     build:
@@ -27,12 +13,8 @@ services:
     env_file:
       - .env
     environment:
-      REDIS_URL: redis://redis:6379
       STYLING_SERVICE_URL: http://styling-service:3300
       STYLING_SERVICE_INTERNAL_TOKEN: ${INTERNAL_API_KEY}
-    depends_on:
-      redis:
-        condition: service_healthy
 
   # Styling Service (DolphJS)
   styling-service:
@@ -48,12 +30,8 @@ services:
     env_file:
       - .env
     environment:
-      REDIS_URL: redis://redis:6379
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
       JWT_SECRET: ${JWT_SECRET}
-    depends_on:
-      redis:
-        condition: service_healthy
 
   # Job Worker (BullMQ)
   job-worker:
@@ -69,12 +47,8 @@ services:
     environment:
       DJANGO_INTERNAL_URL: http://backend:8000
       STYLING_SERVICE_INTERNAL_URL: http://styling-service:3300
-      REDIS_URL: redis://redis:6379
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
-    depends_on:
-      redis:
-        condition: service_healthy
 
   # # Frontend (React + Vite)
   # frontend:
@@ -89,9 +63,6 @@ services:
   #     - "5173:5173"
   #   env_file:
   #     - .env
-  #   depends_on:
-  #     - backend
-  #     - styling-service
-
-volumes:
-  redis_data:
+    #   depends_on:
+    #     - backend
+    #     - styling-service

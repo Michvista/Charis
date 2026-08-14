@@ -5,7 +5,6 @@ import {
   Post,
   Patch,
   Get,
-  DBody,
   DParam,
   DRes,
   Shield,
@@ -44,7 +43,8 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
   }
 
   @Post()
-  async evaluateOutfit(@DBody() body: EvaluateVerdictDTO, @DReq() req: any, @DRes() res: any) {
+  async evaluateOutfit(@DReq() req: any, @DRes() res: any) {
+    const body = (req.body ?? {}) as EvaluateVerdictDTO;
     const userId = req.payload?.id;
 
     if (!userId) {
@@ -65,7 +65,8 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
   }
 
   @Patch(":id/complete")
-  async completeOutfit(@DParam("id") id: string, @DBody() body: any, @DReq() req: any, @DRes() res: any) {
+  async completeOutfit(@DParam("id") id: string, @DReq() req: any, @DRes() res: any) {
+    const body = req.body ?? {};
     const payloadId = req.payload?.id;
     if (payloadId !== "internal-service") {
       return res.status(403).json({

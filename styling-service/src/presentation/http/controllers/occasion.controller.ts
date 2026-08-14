@@ -5,7 +5,6 @@ import {
   Route,
   Post,
   Get,
-  DBody,
   DReq,
   DRes,
   Shield,
@@ -28,7 +27,8 @@ export class OccasionController extends DolphControllerHandler<Dolph> {
   }
 
   @Post()
-  async create(@DBody() body: CreateOccasionDTO, @DReq() req: any, @DRes() res: any) {
+  async create(@DReq() req: any, @DRes() res: any) {
+    const body = (req.body ?? {}) as CreateOccasionDTO;
     const result = await this.createOccasionUseCase.execute(body);
 
     if (result.isFailure) {

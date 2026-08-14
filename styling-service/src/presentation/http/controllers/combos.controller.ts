@@ -1,6 +1,6 @@
 import { DolphControllerHandler } from '@dolphjs/dolph/classes';
 import { Dolph, SuccessResponse } from '@dolphjs/dolph/common';
-import { Route, Post, DBody, DRes, Shield, DReq } from '@dolphjs/dolph/decorators';
+import { Route, Post, DRes, Shield, DReq } from '@dolphjs/dolph/decorators';
 import { GenerateCombosDTO } from '../../../application/outfit/dtos/generate-combos.dto';
 import { GenerateCombosUseCase } from '../../../application/outfit/use-cases/generate-combos.use-case';
 import { TypeOrmOutfitRepository } from '../../../infrastructure/database/typeorm/repositories/typeorm-outfit.repository';
@@ -26,7 +26,8 @@ export class CombosController extends DolphControllerHandler<Dolph> {
   }
 
   @Post()
-  async generateCombos(@DBody() body: GenerateCombosDTO, @DReq() req: any, @DRes() res: any) {
+  async generateCombos(@DReq() req: any, @DRes() res: any) {
+    const body = (req.body ?? {}) as GenerateCombosDTO;
     const userId = req.payload?.id;
 
     if (!userId) {
@@ -47,7 +48,8 @@ export class CombosController extends DolphControllerHandler<Dolph> {
   }
 
   @Post("generate-sync")
-  async generateCombosSync(@DBody() body: any, @DReq() req: any, @DRes() res: any) {
+  async generateCombosSync(@DReq() req: any, @DRes() res: any) {
+    const body = req.body ?? {};
     const userId = req.payload?.id;
 
     if (!userId) {

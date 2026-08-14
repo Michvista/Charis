@@ -273,6 +273,22 @@ function testSeasonCompatibility(): void {
   );
 }
 
+function testColorCompatibilityModel(): void {
+  const neutralPair = compatibilityService.evaluateColorPair("#111111", "#f5f5f5");
+  const analogousPair = compatibilityService.evaluateColorPair("#f97316", "#f59e0b");
+  const complementaryPair = compatibilityService.evaluateColorPair("#2563eb", "#f97316");
+  const similarBoldPair = compatibilityService.evaluateColorPair("#dc2626", "#ef4444");
+
+  assert.ok(neutralPair > 0, "neutral pairs should be friendly");
+  assert.ok(analogousPair > 0, "analogous colors should be positive");
+  assert.ok(complementaryPair > analogousPair, "complementary colors should outrank analogous pairs");
+  assert.ok(similarBoldPair <= 0, "near-identical saturated colors should be discouraged");
+  assert.ok(
+    complementaryPair > similarBoldPair,
+    "strong contrast should beat overly similar bold colors",
+  );
+}
+
 function testOptionalRolesAndDeterminism(): void {
   const wardrobe: WardrobeItemInput[] = [
     item("top-a", "TOP", "#f4d7c5", 3, ["SUMMER"]),
@@ -336,6 +352,7 @@ function testUpperBoundSafety(): void {
 function main(): void {
   testTopNAndPruning();
   testSeasonCompatibility();
+  testColorCompatibilityModel();
   testOptionalRolesAndDeterminism();
   testUpperBoundSafety();
   console.log("algorithm regression checks passed");

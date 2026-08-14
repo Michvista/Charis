@@ -339,93 +339,67 @@ export class StyleCompatibilityService {
     const lightnessDiff = Math.abs(parsedA.l - parsedB.l);
     const neutralA = this.isNeutral(parsedA, colorA);
     const neutralB = this.isNeutral(parsedB, colorB);
+    const bothNeutral = neutralA && neutralB;
+    const oneNeutral = neutralA !== neutralB;
+    const bothSaturated = parsedA.s >= 0.45 && parsedB.s >= 0.45;
 
-    if (hueDiff <= 10) {
-      if (neutralA && neutralB) {
-        return 10;
+    if (bothNeutral) {
+      const neutralScore = 17 + (lightnessDiff <= 0.12 ? 1 : 0) + (lightnessDiff >= 0.35 ? 1 : 0);
+      return this.clampPairScore(neutralScore);
+    }
+
+    if (oneNeutral) {
+      let score = 11;
+
+      if (lightnessDiff >= 0.2) {
+        score += 2;
       }
 
-      if (!neutralA && !neutralB) {
-        return -6;
+      if (lightnessDiff <= 0.08 && saturationDiff <= 0.15) {
+        score += 1;
       }
 
-      return 12;
+      return this.clampPairScore(score);
     }
 
-    if (neutralA && neutralB) {
-      return 14;
+    let score = 0;
+
+    if (hueDiff <= 8) {
+      score += bothSaturated ? -7 : 6;
+      if (bothSaturated && lightnessDiff <= 0.12) {
+        score -= 2;
+      }
+    } else if (hueDiff <= 30) {
+      score += 12;
+    } else if (hueDiff <= 50) {
+      score += 10;
+    } else if (hueDiff <= 85) {
+      score += 6;
+    } else if (hueDiff <= 145) {
+      score += 11;
+    } else {
+      score += 16;
     }
 
-    if (neutralA !== neutralB) {
-      return 12;
+    if (bothSaturated && hueDiff <= 18 && saturationDiff <= 0.18 && lightnessDiff <= 0.18) {
+      score -= 3;
     }
 
-    if (hueDiff >= 150 && hueDiff <= 210 && parsedA.s >= 0.25 && parsedB.s >= 0.25) {
-      return 16;
+    if (lightnessDiff >= 0.45) {
+      score += hueDiff >= 70 ? 4 : 2;
+    } else if (lightnessDiff >= 0.25) {
+      score += 2;
+    } else if (lightnessDiff <= 0.1 && bothSaturated && hueDiff <= 40) {
+      score -= 2;
     }
 
-    if (hueDiff <= 45) {
-      return 11;
+    if (saturationDiff <= 0.12 && hueDiff >= 100 && hueDiff <= 170) {
+      score += 1;
+    } else if (saturationDiff >= 0.5 && hueDiff <= 25) {
+      score -= 1;
     }
 
-    if (lightnessDiff >= 0.45 && hueDiff >= 90) {
-      return 7;
-    }
-
-    if (
-      hueDiff >= 25 &&
-      hueDiff <= 75 &&
-      parsedA.s >= 0.5 &&
-      parsedB.s >= 0.5 &&
-      lightnessDiff <= 0.35
-    ) {
-      return -8;
-    }
-
-    if (hueDiff >= 80 && hueDiff <= 140 && lightnessDiff <= 0.25) {
-      return 5;
-    }
-
-    const familyA = this.getColorFamily(parsedA);
-    const familyB = this.getColorFamily(parsedB);
-
-    if (familyA === "warm-yellow" && familyB === "warm-yellow") {
-      return -8;
-    }
-
-    if (familyA === "warm-red" && familyB === "warm-red") {
-      return -6;
-    }
-
-    if (
-      (familyA === "warm-yellow" && familyB === "warm-red") ||
-      (familyA === "warm-red" && familyB === "warm-yellow")
-    ) {
-      return -4;
-    }
-
-    if (
-      (familyA === "warm-yellow" && familyB === "cool-blue") ||
-      (familyA === "cool-blue" && familyB === "warm-yellow")
-    ) {
-      return 14;
-    }
-
-    if (
-      (familyA === "warm-red" && familyB === "cool-blue") ||
-      (familyA === "cool-blue" && familyB === "warm-red")
-    ) {
-      return 12;
-    }
-
-    if (
-      (familyA === "cool-blue" && familyB === "cool-green") ||
-      (familyA === "cool-green" && familyB === "cool-blue")
-    ) {
-      return 8;
-    }
-
-    return 3;
+    return this.clampPairScore(score);
   }
 
   public estimateUpperBound(
@@ -599,28 +573,8 @@ export class StyleCompatibilityService {
     return map[color] || null;
   }
 
-  private getColorFamily(color: { h: number; s: number; l: number }): string {
-    if (color.s <= 0.15) {
-      return "neutral";
-    }
-
-    if ((color.h >= 0 && color.h <= 30) || (color.h >= 330 && color.h <= 360)) {
-      return "warm-red";
-    }
-
-    if (color.h >= 31 && color.h <= 90) {
-      return "warm-yellow";
-    }
-
-    if (color.h >= 91 && color.h <= 150) {
-      return "cool-green";
-    }
-
-    if (color.h >= 151 && color.h <= 250) {
-      return "cool-blue";
-    }
-
-    return "purple";
+  private clampPairScore(score: number): number {
+    return Math.max(-12, Math.min(18, Math.round(score)));
   }
 
   private rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {

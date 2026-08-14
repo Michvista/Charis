@@ -8,6 +8,12 @@ import {
 import { sendJson } from "../shared/http";
 import { ComboJobData } from "../queues/combo.queue";
 
+const getStylingServiceBaseUrl = (): string =>
+  process.env.STYLING_SERVICE_INTERNAL_URL || "http://localhost:3000";
+
+const getVerdictCompleteUrl = (outfitId: string): string =>
+  `${getStylingServiceBaseUrl()}/verdict/${outfitId}/complete`;
+
 interface GeneratedCombo {
   items: Array<{
     id: string;
@@ -90,7 +96,7 @@ export function startComboWorker(): Worker<ComboJobData> {
         reranked.sort((left, right) => right.finalScore - left.finalScore);
 
         await sendJson(
-          `${process.env.STYLING_SERVICE_INTERNAL_URL || "http://localhost:3000"}/outfits/${outfitId}/complete`,
+          getVerdictCompleteUrl(outfitId),
           "PATCH",
           {
             combos: reranked.slice(0, 10),
@@ -105,7 +111,7 @@ export function startComboWorker(): Worker<ComboJobData> {
       } catch (error) {
         console.error(`[combo-generation] failed job ${job.id} for outfit ${outfitId}`, error);
         await sendJson(
-          `${process.env.STYLING_SERVICE_INTERNAL_URL || "http://localhost:3000"}/outfits/${outfitId}/complete`,
+          getVerdictCompleteUrl(outfitId),
           "PATCH",
           {
             status: "failed",

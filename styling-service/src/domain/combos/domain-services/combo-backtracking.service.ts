@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 // Combo backtracking domain service
 
 import {
@@ -64,7 +66,7 @@ export class ComboBacktrackingDomainService {
       if (this.isValidCombination(current)) {
         const score = this.scoreCombination(current, context);
         this.insertTopN(topN, {
-          comboId: crypto.randomUUID(),
+          comboId: randomUUID(),
           items: [...current],
           score,
         }, maxResults);

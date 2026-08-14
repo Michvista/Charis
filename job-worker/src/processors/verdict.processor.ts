@@ -8,6 +8,12 @@ import {
 import { sendJson } from "../shared/http";
 import { VerdictJobData } from "../queues/verdict.queue";
 
+const getStylingServiceBaseUrl = (): string =>
+  process.env.STYLING_SERVICE_INTERNAL_URL || "http://localhost:3000";
+
+const getVerdictCompleteUrl = (outfitId: string): string =>
+  `${getStylingServiceBaseUrl()}/verdict/${outfitId}/complete`;
+
 const VERDICT_PROMPT = (occasion: string, formality: number) =>
   `These clothing items are for ${occasion} (formality level ${formality}/5). Do they work together? Check visual harmony, patterns, textures, and colour balance.
 Return ONLY valid JSON with no markdown:
@@ -32,7 +38,7 @@ export function startVerdictWorker(): Worker<VerdictJobData> {
         const parsed = validateVerdictResult(parseGeminiJson(raw));
 
         await sendJson(
-          `${process.env.STYLING_SERVICE_INTERNAL_URL || "http://localhost:3000"}/outfits/${outfitId}/complete`,
+          getVerdictCompleteUrl(outfitId),
           "PATCH",
           {
             aiVerdict: parsed,
@@ -47,7 +53,7 @@ export function startVerdictWorker(): Worker<VerdictJobData> {
       } catch (error) {
         console.error(`[outfit-verdict] failed job ${job.id} for outfit ${outfitId}`, error);
         await sendJson(
-          `${process.env.STYLING_SERVICE_INTERNAL_URL || "http://localhost:3000"}/outfits/${outfitId}/complete`,
+          getVerdictCompleteUrl(outfitId),
           "PATCH",
           {
             status: "failed",

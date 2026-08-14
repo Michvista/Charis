@@ -1,16 +1,12 @@
 import { Worker } from "bullmq";
 import { createRedisConnection } from "../shared/redis";
-import { callGeminiVision, parseGeminiJson } from "../shared/gemini";
+import {
+  callGeminiVision,
+  parseGeminiJson,
+  validateVerdictResult,
+} from "../shared/gemini";
 import { sendJson } from "../shared/http";
 import { VerdictJobData } from "../queues/verdict.queue";
-
-interface GeminiVerdictResult {
-  verdict: "works" | "doesnt_work" | "partially_works";
-  confidence: number;
-  visualNotes: string;
-  patternClash: boolean;
-  colourClash: boolean;
-}
 
 const VERDICT_PROMPT = (occasion: string, formality: number) =>
   `These clothing items are for ${occasion} (formality level ${formality}/5). Do they work together? Check visual harmony, patterns, textures, and colour balance.
@@ -30,23 +26,41 @@ export function startVerdictWorker(): Worker<VerdictJobData> {
       const { outfitId, items, occasion, occasionFormality } = job.data;
       console.log(`[outfit-verdict] started job ${job.id} for outfit ${outfitId}`);
 
-      const imageUrls = items.map((item) => item.imageUrl);
-      const raw = await callGeminiVision(VERDICT_PROMPT(occasion, occasionFormality), imageUrls);
-      const parsed = parseGeminiJson<GeminiVerdictResult>(raw);
+      try {
+        const imageUrls = items.map((item) => item.imageUrl);
+        const raw = await callGeminiVision(VERDICT_PROMPT(occasion, occasionFormality), imageUrls);
+        const parsed = validateVerdictResult(parseGeminiJson(raw));
 
-      await sendJson(
-        `${process.env.STYLING_SERVICE_INTERNAL_URL || "http://localhost:3000"}/outfits/${outfitId}/complete`,
-        "PATCH",
-        {
-          aiVerdict: parsed,
-          status: "done",
-        },
-        {
-          Authorization: `Bearer ${process.env.INTERNAL_API_KEY || ""}`,
-        },
-      );
+        await sendJson(
+          `${process.env.STYLING_SERVICE_INTERNAL_URL || "http://localhost:3000"}/outfits/${outfitId}/complete`,
+          "PATCH",
+          {
+            aiVerdict: parsed,
+            status: "done",
+          },
+          {
+            Authorization: `Bearer ${process.env.INTERNAL_API_KEY || ""}`,
+          },
+        );
 
-      console.log(`[outfit-verdict] completed job ${job.id} for outfit ${outfitId}`);
+        console.log(`[outfit-verdict] completed job ${job.id} for outfit ${outfitId}`);
+      } catch (error) {
+        console.error(`[outfit-verdict] failed job ${job.id} for outfit ${outfitId}`, error);
+        await sendJson(
+          `${process.env.STYLING_SERVICE_INTERNAL_URL || "http://localhost:3000"}/outfits/${outfitId}/complete`,
+          "PATCH",
+          {
+            status: "failed",
+            errorMessage: error instanceof Error ? error.message : "Verdict worker failed",
+          },
+          {
+            Authorization: `Bearer ${process.env.INTERNAL_API_KEY || ""}`,
+          },
+        ).catch((patchError) => {
+          console.error(`[outfit-verdict] failed to mark outfit ${outfitId} as failed`, patchError);
+        });
+        throw error;
+      }
     },
     {
       connection: createRedisConnection() as any,

@@ -11,6 +11,7 @@ import {
   Shield,
   DReq,
 } from "@dolphjs/dolph/decorators";
+import { EvaluateVerdictDTO } from "../../../application/outfit/dtos/verdict-response.dto";
 import { TypeOrmOutfitRepository } from "../../../infrastructure/database/typeorm/repositories/typeorm-outfit.repository";
 import { TypeOrmOccasionRepository } from "../../../infrastructure/database/typeorm/repositories/typeorm-occasion.repository";
 import { EvaluateVerdictUseCase } from "../../../application/outfit/use-cases/evaluate-verdict.use-case";
@@ -26,10 +27,10 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
   private outfitRepo: TypeOrmOutfitRepository;
   private occasionRepo: TypeOrmOccasionRepository;
 
-  constructor() {
+  constructor(outfitRepo: TypeOrmOutfitRepository, occasionRepo: TypeOrmOccasionRepository) {
     super();
-    this.outfitRepo = new TypeOrmOutfitRepository();
-    this.occasionRepo = new TypeOrmOccasionRepository();
+    this.outfitRepo = outfitRepo;
+    this.occasionRepo = occasionRepo;
     this.evaluateUseCase = new EvaluateVerdictUseCase(
       this.outfitRepo,
       this.occasionRepo,
@@ -37,7 +38,7 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
   }
 
   @Post()
-  async evaluateOutfit(@DBody() body: any, @DReq() req: any, @DRes() res: any) {
+  async evaluateOutfit(@DBody() body: EvaluateVerdictDTO, @DReq() req: any, @DRes() res: any) {
     const userId = req.payload?.id;
 
     if (!userId) {
@@ -47,10 +48,9 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
       });
     }
 
-    const dto = {
+    const dto: EvaluateVerdictDTO = {
+      ...body,
       userId,
-      occasionId: body.occasionId,
-      items: body.items || [],
     };
 
     const result = await this.evaluateUseCase.execute(dto);
@@ -74,40 +74,48 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
       return res.status(404).json({ status: "fail", message: "Outfit not found" });
     }
 
-    let compatibilityScore = outfit.compatibilityScore;
-    let verdictText = outfit.verdictText || "";
-    let status: "pending" | "done" | "failed" = body.status || "done";
-    let rankedCombos = outfit.rankedCombos;
+    const completedOutfit = Outfit.create(
+      {
+        userId: outfit.userId,
+        occasionId: outfit.occasionId,
+        compatibilityScore: outfit.compatibilityScoreVO,
+        verdictText: outfit.verdictText,
+        status: outfit.status,
+        rankedCombos: outfit.rankedCombos,
+        items: outfit.items.map((item) =>
+          OutfitItem.create(
+            {
+              wardrobeItemId: item.wardrobeItemId,
+              itemRole: item.itemRole,
+            },
+            item.id,
+          ),
+        ),
+      },
+      outfit.id,
+    );
 
-    if (body.aiVerdict) {
-      compatibilityScore = Number(body.aiVerdict.confidence) || 0;
-      verdictText = `${body.aiVerdict.verdict}: ${body.aiVerdict.visualNotes}`;
+    if (body.status === "failed") {
+      completedOutfit.fail(body.errorMessage || "Outfit processing failed.");
+    } else if (body.aiVerdict) {
+      completedOutfit.complete({
+        compatibilityScore: Number(body.aiVerdict.confidence) || 0,
+        verdictText: `${body.aiVerdict.verdict}: ${body.aiVerdict.visualNotes}`,
+      });
     } else if (Array.isArray(body.combos)) {
       const bestCombo = body.combos[0];
-      if (bestCombo) {
-        compatibilityScore = Number(bestCombo.finalScore ?? bestCombo.score ?? 0);
-        verdictText = bestCombo.visualNotes || "Combo generation complete.";
-      }
-      rankedCombos = body.combos.slice(0, 3);
+      completedOutfit.complete({
+        compatibilityScore: Number(bestCombo?.finalScore ?? bestCombo?.score ?? 0),
+        verdictText: bestCombo?.visualNotes || "Combo generation complete.",
+        rankedCombos: body.combos.slice(0, 10),
+      });
+    } else {
+      completedOutfit.complete({
+        compatibilityScore: outfit.compatibilityScoreVO,
+        verdictText: outfit.verdictText || "",
+        rankedCombos: outfit.rankedCombos,
+      });
     }
-
-    const completedOutfit = Outfit.create({
-      userId: outfit.userId,
-      occasionId: outfit.occasionId,
-      compatibilityScore,
-      verdictText,
-      status,
-      rankedCombos,
-      items: outfit.items.map((item) =>
-        OutfitItem.create(
-          {
-            wardrobeItemId: item.wardrobeItemId,
-            itemRole: item.itemRole,
-          },
-          item.id,
-        ),
-      ),
-    }, outfit.id);
 
     const savedOutfit = await this.outfitRepo.save(completedOutfit);
     SuccessResponse({ res, body: OutfitDtoMapper.toVerdictDTO(savedOutfit) });

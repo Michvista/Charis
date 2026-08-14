@@ -13,7 +13,7 @@ export class CompatibilityScore extends ValueObject<ScoreProps> {
   }
 
   public static create(score: number): Result<CompatibilityScore> {
-    if (score < 0 || score > 100) {
+    if (typeof score !== "number" || Number.isNaN(score) || score < 0 || score > 100) {
       return Result.fail<CompatibilityScore>(
         "Score must be between 0 and 100.",
       );

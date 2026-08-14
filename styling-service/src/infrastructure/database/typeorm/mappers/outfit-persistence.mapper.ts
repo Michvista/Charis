@@ -2,6 +2,7 @@
 
 import { Outfit } from "../../../../domain/outfit/aggregates/outfit.aggregate";
 import { OutfitItem } from "../../../../domain/outfit/entities/outfit-item.domain-entity";
+import { CompatibilityScore } from "../../../../domain/outfit/value-objects/compatibility-score.vo";
 import { OutfitOrmEntity } from "../entities/outfit.orm-entity";
 import { OutfitItemOrmEntity } from "../entities/outfit-item.orm-entity";
 
@@ -18,7 +19,8 @@ export class OutfitPersistenceMapper {
       {
         userId: ormEntity.userId,
         occasionId: ormEntity.occasion?.id,
-        compatibilityScore: ormEntity.compatibilityScore,
+        compatibilityScore:
+          CompatibilityScore.create(ormEntity.compatibilityScore).getValue(),
         verdictText: ormEntity.verdictText,
         status: ormEntity.status as "pending" | "done" | "failed",
         rankedCombos: Array.isArray(ormEntity.rankedCombos)
@@ -34,7 +36,7 @@ export class OutfitPersistenceMapper {
     const orm = new OutfitOrmEntity();
     orm.id = domainAggregate.id;
     orm.userId = domainAggregate.userId;
-    orm.compatibilityScore = domainAggregate.compatibilityScore;
+    orm.compatibilityScore = domainAggregate.compatibilityScoreVO.value;
     orm.verdictText = domainAggregate.verdictText || "";
     orm.status = domainAggregate.status;
     orm.rankedCombos = domainAggregate.rankedCombos || [];

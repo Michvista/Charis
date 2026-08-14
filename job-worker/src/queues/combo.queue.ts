@@ -11,6 +11,7 @@ export interface ComboJobData {
     formalityLevel?: number;
     seasonTags?: string[];
   }>;
+  occasion: string;
   occasionFormality: number;
   targetSeason?: string;
   maxResults?: number;

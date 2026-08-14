@@ -13,6 +13,8 @@
     "dev:docker:stop": "docker-compose -f docker-compose-dev.yml down",
     "build": "dolph build",
     "build:tsc": "tsc && tsc-alias",
+    "test:algorithms": "ts-node -T tests/algorithm-regression.ts",
+    "test": "npm run test:algorithms",
     "start": "dolph start",
     "clean": "rm -r app && rm -r logs"
   },

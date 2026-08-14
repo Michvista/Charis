@@ -1,6 +1,7 @@
 import { DolphControllerHandler } from '@dolphjs/dolph/classes';
 import { Dolph, SuccessResponse } from '@dolphjs/dolph/common';
 import { Route, Post, DBody, DRes, Shield, DReq } from '@dolphjs/dolph/decorators';
+import { GenerateCombosDTO } from '../../../application/outfit/dtos/generate-combos.dto';
 import { GenerateCombosUseCase } from '../../../application/outfit/use-cases/generate-combos.use-case';
 import { TypeOrmOutfitRepository } from '../../../infrastructure/database/typeorm/repositories/typeorm-outfit.repository';
 import { TypeOrmOccasionRepository } from '../../../infrastructure/database/typeorm/repositories/typeorm-occasion.repository';
@@ -13,17 +14,17 @@ export class CombosController extends DolphControllerHandler<Dolph> {
   private generateUseCase: GenerateCombosUseCase;
   private comboService: ComboBacktrackingDomainService;
 
-  constructor() {
+  constructor(
+    outfitRepo: TypeOrmOutfitRepository,
+    occasionRepo: TypeOrmOccasionRepository,
+  ) {
     super();
-    this.generateUseCase = new GenerateCombosUseCase(
-      new TypeOrmOutfitRepository(),
-      new TypeOrmOccasionRepository(),
-    );
+    this.generateUseCase = new GenerateCombosUseCase(outfitRepo, occasionRepo);
     this.comboService = new ComboBacktrackingDomainService();
   }
 
   @Post()
-  async generateCombos(@DBody() body: any, @DReq() req: any, @DRes() res: any) {
+  async generateCombos(@DBody() body: GenerateCombosDTO, @DReq() req: any, @DRes() res: any) {
     const userId = req.payload?.id;
 
     if (!userId) {
@@ -33,11 +34,9 @@ export class CombosController extends DolphControllerHandler<Dolph> {
       });
     }
 
-    const dto = {
+    const dto: GenerateCombosDTO = {
+      ...body,
       userId,
-      occasionId: body.occasionId,
-      targetSeason: body.targetSeason,
-      items: body.items || [],
     };
 
     const result = await this.generateUseCase.execute(dto);

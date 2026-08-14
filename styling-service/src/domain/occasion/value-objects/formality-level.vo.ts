@@ -13,7 +13,7 @@ export class FormalityLevel extends ValueObject<FormalityProps> {
   }
 
   public static create(level: number): Result<FormalityLevel> {
-    if (level < 1 || level > 5) {
+    if (typeof level !== "number" || Number.isNaN(level) || !Number.isInteger(level) || level < 1 || level > 5) {
       return Result.fail<FormalityLevel>(
         "Formality level must be between 1 (Casual) and 5 (Black Tie).",
       );

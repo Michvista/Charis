@@ -13,6 +13,7 @@ export interface ComboGenerationJobData {
     formalityLevel?: number;
     seasonTags?: string[];
   }>;
+  occasion: string;
   occasionFormality: number;
   targetSeason?: string;
   maxResults?: number;

@@ -9,6 +9,7 @@ import { IOccasionRepository } from "../../../domain/occasion/repositories/occas
 import { IOutfitRepository } from "../../../domain/outfit/repositories/outfit.repository.interface";
 import { Outfit } from "../../../domain/outfit/aggregates/outfit.aggregate";
 import { OutfitItem } from "../../../domain/outfit/entities/outfit-item.domain-entity";
+import { CompatibilityScore } from "../../../domain/outfit/value-objects/compatibility-score.vo";
 import { BullMQPublisher } from "../../../infrastructure/queue/bullmq-combos.publisher";
 
 export class GenerateCombosUseCase implements IUseCase<
@@ -36,7 +37,7 @@ export class GenerateCombosUseCase implements IUseCase<
     const outfit = Outfit.create({
       userId: request.userId,
       occasionId: request.occasionId,
-      compatibilityScore: 0,
+      compatibilityScore: CompatibilityScore.create(0).getValue(),
       verdictText: "processing",
       status: "pending",
       items: request.items.map((item) =>
@@ -52,6 +53,7 @@ export class GenerateCombosUseCase implements IUseCase<
     await this.publisher.publishComboJob({
       outfitId: savedOutfit.id,
       wardrobeItems: request.items,
+      occasion: occasion?.name || "the selected occasion",
       occasionFormality: occasion?.formalityLevel ?? 3,
       targetSeason: request.targetSeason,
       maxResults: 10,

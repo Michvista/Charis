@@ -9,6 +9,7 @@ import { IOutfitRepository } from "../../../domain/outfit/repositories/outfit.re
 import { IOccasionRepository } from "../../../domain/occasion/repositories/occasion.repository.interface";
 import { Outfit } from "../../../domain/outfit/aggregates/outfit.aggregate";
 import { OutfitItem } from "../../../domain/outfit/entities/outfit-item.domain-entity";
+import { CompatibilityScore } from "../../../domain/outfit/value-objects/compatibility-score.vo";
 import { BullMQPublisher } from "../../../infrastructure/queue/bullmq-combos.publisher";
 
 export class EvaluateVerdictUseCase implements IUseCase<
@@ -44,7 +45,7 @@ export class EvaluateVerdictUseCase implements IUseCase<
     const outfit = Outfit.create({
       userId: request.userId,
       occasionId: request.occasionId,
-      compatibilityScore: 0,
+      compatibilityScore: CompatibilityScore.create(0).getValue(),
       verdictText: "processing",
       status: "pending",
       items: outfitItems,

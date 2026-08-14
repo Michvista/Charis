@@ -1,4 +1,4 @@
-// Shared outfit compatibility engine
+// Shared weighted graph-based pairwise compatibility engine
 
 export type OutfitRole =
   | "TOP"

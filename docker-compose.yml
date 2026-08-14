@@ -22,6 +22,7 @@ services:
       context: ./styling-service
       dockerfile: Dockerfile
     container_name: charis_styling
+    command: sh -c "npm ci && npm run dev:start"
     volumes:
       - ./styling-service:/app
       - /app/node_modules
@@ -44,6 +45,7 @@ services:
       - /app/node_modules
     env_file:
       - .env
+    command: sh -c "npm ci && npm run dev:watch"
     environment:
       DJANGO_INTERNAL_URL: http://backend:8000
       STYLING_SERVICE_INTERNAL_URL: http://styling-service:3300

@@ -3,6 +3,17 @@
 import IORedis from "ioredis";
 import { Queue } from "bullmq";
 
+function normalizeRedisUrl(rawUrl: string): string {
+  const parsed = new URL(rawUrl);
+
+  if (parsed.hostname.endsWith("upstash.io")) {
+    const password = encodeURIComponent(parsed.password);
+    return `rediss://:${password}@${parsed.hostname}:${parsed.port || "6379"}`;
+  }
+
+  return rawUrl;
+}
+
 export interface ComboGenerationJobData {
   outfitId: string;
   wardrobeItems: Array<{
@@ -37,7 +48,7 @@ export class BullMQPublisher {
   private readonly verdictQueue: Queue<VerdictJobData>;
 
   constructor() {
-    const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+    const redisUrl = normalizeRedisUrl(process.env.REDIS_URL || "redis://localhost:6379");
     this.connection = new IORedis(redisUrl, {
       maxRetriesPerRequest: null,
     });

@@ -41,7 +41,14 @@ export const authShield = (req: DRequest, res: DResponse, next: DNextFunc) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
-    const userId = typeof decoded.sub === "string" ? decoded.sub : decoded.id;
+    const userId =
+      typeof decoded.user_id === "string"
+        ? decoded.user_id
+        : typeof decoded.sub === "string"
+          ? decoded.sub
+          : typeof decoded.id === "string"
+            ? decoded.id
+            : undefined;
 
     if (!userId || typeof userId !== "string") {
       return res.status(401).json({

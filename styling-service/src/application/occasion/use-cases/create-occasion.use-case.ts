@@ -17,6 +17,14 @@ export class CreateOccasionUseCase implements IUseCase<
   async execute(
     request: CreateOccasionDTO,
   ): Promise<Result<OccasionResponseDTO>> {
+    if (!request || typeof request.name !== "string" || !request.name.trim()) {
+      return Result.fail<OccasionResponseDTO>("Occasion name is required.");
+    }
+
+    if (typeof request.formalityLevel !== "number") {
+      return Result.fail<OccasionResponseDTO>("Formality level is required.");
+    }
+
     const existing = await this.occasionRepo.findByName(request.name);
     if (existing) {
       return Result.fail<OccasionResponseDTO>(

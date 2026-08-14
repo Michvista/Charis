@@ -8,22 +8,23 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "dev:start": "dolph watch",
+    "dev:start": "nodemon --watch src --ext ts,json --exec \"ts-node -T src/server.ts\"",
+    "dev:watch": "npm run dev:start",
     "dev:docker:start": "docker-compose -f docker-compose-dev.yml up",
     "dev:docker:stop": "docker-compose -f docker-compose-dev.yml down",
-    "build": "dolph build",
+    "build": "npm run build:tsc",
     "build:tsc": "tsc && tsc-alias",
     "test:algorithms": "ts-node -T tests/algorithm-regression.ts",
     "test": "npm run test:algorithms",
-    "start": "dolph start",
+    "start": "node app/server.js",
     "clean": "rm -r app && rm -r logs"
   },
   "dependencies": {
     "@dolphjs/dolph": "^1.4.3",
     "bullmq": "^6.1.0",
     "ioredis": "^5.11.1",
-    "pg": "^8.23.0",
     "jsonwebtoken": "^9.0.2",
+    "pg": "^8.23.0",
     "reflect-metadata": "^0.2.2",
     "typeorm": "^1.1.0"
   },
@@ -33,6 +34,7 @@
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.8.2",
+    "nodemon": "^3.1.10",
     "ts-node": "^10.9.1",
     "tsc-alias": "^1.8.8",
     "tsconfig-paths": "^4.2.0",

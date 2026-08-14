@@ -5,17 +5,23 @@ import {
   GenerateCombosDTO,
   GenerateCombosResponseDTO,
 } from "../dtos/generate-combos.dto";
-import { ComboBacktrackingDomainService } from "../../../domain/combos/domain-services/combo-backtracking.service";
 import { IOccasionRepository } from "../../../domain/occasion/repositories/occasion.repository.interface";
+import { IOutfitRepository } from "../../../domain/outfit/repositories/outfit.repository.interface";
+import { Outfit } from "../../../domain/outfit/aggregates/outfit.aggregate";
+import { OutfitItem } from "../../../domain/outfit/entities/outfit-item.domain-entity";
+import { BullMQPublisher } from "../../../infrastructure/queue/bullmq-combos.publisher";
 
 export class GenerateCombosUseCase implements IUseCase<
   GenerateCombosDTO,
   GenerateCombosResponseDTO
 > {
-  private algoService: ComboBacktrackingDomainService;
+  private publisher: BullMQPublisher;
 
-  constructor(private occasionRepo?: IOccasionRepository) {
-    this.algoService = new ComboBacktrackingDomainService();
+  constructor(
+    private outfitRepo: IOutfitRepository,
+    private occasionRepo?: IOccasionRepository,
+  ) {
+    this.publisher = new BullMQPublisher();
   }
 
   async execute(request: GenerateCombosDTO): Promise<GenerateCombosResponseDTO> {
@@ -27,14 +33,33 @@ export class GenerateCombosUseCase implements IUseCase<
       throw new Error("Occasion not found.");
     }
 
-    const combos = this.algoService.generateCombinations(request.items, {
-      occasionFormality: occasion?.formalityLevel,
+    const outfit = Outfit.create({
+      userId: request.userId,
+      occasionId: request.occasionId,
+      compatibilityScore: 0,
+      verdictText: "processing",
+      status: "pending",
+      items: request.items.map((item) =>
+        OutfitItem.create({
+          wardrobeItemId: item.id,
+          itemRole: item.category,
+        }),
+      ),
+    });
+
+    const savedOutfit = await this.outfitRepo.save(outfit);
+
+    await this.publisher.publishComboJob({
+      outfitId: savedOutfit.id,
+      wardrobeItems: request.items,
+      occasionFormality: occasion?.formalityLevel ?? 3,
       targetSeason: request.targetSeason,
+      maxResults: 10,
     });
 
     return {
-      totalCombos: combos.length,
-      combinations: combos,
+      outfitId: savedOutfit.id,
+      status: "processing",
     };
   }
 }

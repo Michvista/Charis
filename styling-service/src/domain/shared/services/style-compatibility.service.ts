@@ -340,8 +340,16 @@ export class StyleCompatibilityService {
     const neutralA = this.isNeutral(parsedA, colorA);
     const neutralB = this.isNeutral(parsedB, colorB);
 
-    if (hueDiff <= 10 && saturationDiff <= 0.1 && lightnessDiff <= 0.12) {
-      return 18;
+    if (hueDiff <= 10) {
+      if (neutralA && neutralB) {
+        return 10;
+      }
+
+      if (!neutralA && !neutralB) {
+        return -6;
+      }
+
+      return 12;
     }
 
     if (neutralA && neutralB) {
@@ -376,6 +384,45 @@ export class StyleCompatibilityService {
 
     if (hueDiff >= 80 && hueDiff <= 140 && lightnessDiff <= 0.25) {
       return 5;
+    }
+
+    const familyA = this.getColorFamily(parsedA);
+    const familyB = this.getColorFamily(parsedB);
+
+    if (familyA === "warm-yellow" && familyB === "warm-yellow") {
+      return -8;
+    }
+
+    if (familyA === "warm-red" && familyB === "warm-red") {
+      return -6;
+    }
+
+    if (
+      (familyA === "warm-yellow" && familyB === "warm-red") ||
+      (familyA === "warm-red" && familyB === "warm-yellow")
+    ) {
+      return -4;
+    }
+
+    if (
+      (familyA === "warm-yellow" && familyB === "cool-blue") ||
+      (familyA === "cool-blue" && familyB === "warm-yellow")
+    ) {
+      return 14;
+    }
+
+    if (
+      (familyA === "warm-red" && familyB === "cool-blue") ||
+      (familyA === "cool-blue" && familyB === "warm-red")
+    ) {
+      return 12;
+    }
+
+    if (
+      (familyA === "cool-blue" && familyB === "cool-green") ||
+      (familyA === "cool-green" && familyB === "cool-blue")
+    ) {
+      return 8;
     }
 
     return 3;
@@ -550,6 +597,30 @@ export class StyleCompatibilityService {
     };
 
     return map[color] || null;
+  }
+
+  private getColorFamily(color: { h: number; s: number; l: number }): string {
+    if (color.s <= 0.15) {
+      return "neutral";
+    }
+
+    if ((color.h >= 0 && color.h <= 30) || (color.h >= 330 && color.h <= 360)) {
+      return "warm-red";
+    }
+
+    if (color.h >= 31 && color.h <= 90) {
+      return "warm-yellow";
+    }
+
+    if (color.h >= 91 && color.h <= 150) {
+      return "cool-green";
+    }
+
+    if (color.h >= 151 && color.h <= 250) {
+      return "cool-blue";
+    }
+
+    return "purple";
   }
 
   private rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {

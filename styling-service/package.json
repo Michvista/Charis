@@ -19,6 +19,7 @@
   "dependencies": {
     "@dolphjs/dolph": "^1.4.3",
     "bullmq": "^6.1.0",
+    "ioredis": "^5.11.1",
     "pg": "^8.23.0",
     "jsonwebtoken": "^9.0.2",
     "reflect-metadata": "^0.2.2",

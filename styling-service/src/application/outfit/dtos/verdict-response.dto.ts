@@ -6,6 +6,7 @@ export interface EvaluateVerdictDTO {
   items: Array<{
     wardrobeItemId: string;
     itemRole: string;
+    imageUrl?: string;
     colorHex?: string;
     formalityLevel?: number;
     seasonTags?: string[];
@@ -14,6 +15,7 @@ export interface EvaluateVerdictDTO {
 
 export interface VerdictResponseDTO {
   outfitId: string;
-  score: number;
-  verdictText: string;
+  status: "processing" | "done" | "failed";
+  score?: number;
+  verdictText?: string;
 }

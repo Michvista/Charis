@@ -20,6 +20,7 @@ export class OutfitPersistenceMapper {
         occasionId: ormEntity.occasion?.id,
         compatibilityScore: ormEntity.compatibilityScore,
         verdictText: ormEntity.verdictText,
+        status: ormEntity.status as "pending" | "done" | "failed",
         items,
       },
       ormEntity.id,
@@ -32,6 +33,7 @@ export class OutfitPersistenceMapper {
     orm.userId = domainAggregate.userId;
     orm.compatibilityScore = domainAggregate.compatibilityScore;
     orm.verdictText = domainAggregate.verdictText || "";
+    orm.status = domainAggregate.status;
     orm.occasion = domainAggregate.occasionId
       ? ({
           id: domainAggregate.occasionId,

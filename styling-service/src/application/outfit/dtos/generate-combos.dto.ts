@@ -13,6 +13,6 @@ export interface GenerateCombosDTO {
 }
 
 export interface GenerateCombosResponseDTO {
-  totalCombos: number;
-  combinations: CombinationResult[];
+  outfitId: string;
+  status: "processing";
 }

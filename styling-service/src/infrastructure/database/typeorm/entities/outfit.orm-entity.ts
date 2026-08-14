@@ -30,6 +30,9 @@ export class OutfitOrmEntity {
   @Column({ type: "text", nullable: true })
   verdictText!: string;
 
+  @Column({ type: "varchar", length: 20, default: "pending" })
+  status!: string;
+
   @OneToMany(() => OutfitItemOrmEntity, (item) => item.outfit, {
     cascade: true,
   })

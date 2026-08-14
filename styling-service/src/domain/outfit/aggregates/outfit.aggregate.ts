@@ -8,6 +8,7 @@ export interface OutfitProps {
   occasionId?: string;
   compatibilityScore: number;
   verdictText?: string;
+  status: "pending" | "done" | "failed";
   items: OutfitItem[];
 }
 
@@ -23,6 +24,9 @@ export class Outfit extends AggregateRoot<OutfitProps> {
   }
   get verdictText(): string | undefined {
     return this.props.verdictText;
+  }
+  get status(): "pending" | "done" | "failed" {
+    return this.props.status;
   }
   get items(): OutfitItem[] {
     return this.props.items;

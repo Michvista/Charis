@@ -7,6 +7,7 @@ export class OutfitDtoMapper {
   public static toVerdictDTO(outfit: Outfit): VerdictResponseDTO {
     return {
       outfitId: outfit.id,
+      status: outfit.status === "pending" ? "processing" : outfit.status,
       score: outfit.compatibilityScore,
       verdictText: outfit.verdictText || "",
     };

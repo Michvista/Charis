@@ -6,16 +6,16 @@ WORKDIR /app
 
 # Install dependencies
 COPY package.json package-lock.json* ./
-RUN npm ci --production || npm install --production
+RUN npm ci || npm install
 
 # Copy source
 COPY . .
 
-# Build the app (Dolph build expected to write into app/ folder)
-RUN npm run build
+# Build the app using the existing TypeScript pipeline
+RUN npm run build:tsc
 
 # Expose the service port used by DolphJS
 EXPOSE 3300
 
-# Start the service
-CMD ["npm", "start"]
+# Start the compiled service directly
+CMD ["node", "app/server.js"]

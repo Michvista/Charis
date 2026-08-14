@@ -8,6 +8,7 @@ import {
 
 export interface WardrobeItemInput {
   id: string;
+  imageUrl?: string;
   category: "TOP" | "BOTTOM" | "SHOES" | "OUTERWEAR" | "ACCESSORY";
   colorHex: string;
   formalityLevel?: number;

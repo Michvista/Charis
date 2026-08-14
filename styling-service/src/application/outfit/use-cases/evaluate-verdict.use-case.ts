@@ -5,24 +5,23 @@ import {
   EvaluateVerdictDTO,
   VerdictResponseDTO,
 } from "../dtos/verdict-response.dto";
-import { CompatibilityGraphDomainService } from "../../../domain/verdict/domain-services/compatibility-graph.service";
 import { IOutfitRepository } from "../../../domain/outfit/repositories/outfit.repository.interface";
 import { IOccasionRepository } from "../../../domain/occasion/repositories/occasion.repository.interface";
 import { Outfit } from "../../../domain/outfit/aggregates/outfit.aggregate";
 import { OutfitItem } from "../../../domain/outfit/entities/outfit-item.domain-entity";
-import { OutfitDtoMapper } from "../mappers/outfit-dto.mapper";
+import { BullMQPublisher } from "../../../infrastructure/queue/bullmq-combos.publisher";
 
 export class EvaluateVerdictUseCase implements IUseCase<
   EvaluateVerdictDTO,
   VerdictResponseDTO
 > {
-  private graphService: CompatibilityGraphDomainService;
+  private publisher: BullMQPublisher;
 
   constructor(
     private outfitRepo: IOutfitRepository,
     private occasionRepo: IOccasionRepository,
   ) {
-    this.graphService = new CompatibilityGraphDomainService();
+    this.publisher = new BullMQPublisher();
   }
 
   async execute(request: EvaluateVerdictDTO): Promise<VerdictResponseDTO> {
@@ -35,16 +34,6 @@ export class EvaluateVerdictUseCase implements IUseCase<
       throw new Error("Occasion not found.");
     }
 
-    const evaluation = this.graphService.evaluateOutfit({
-      items: request.items.map((i) => ({
-        itemRole: i.itemRole,
-        colorHex: i.colorHex,
-        formalityLevel: i.formalityLevel,
-        seasonTags: i.seasonTags,
-      })),
-      occasionFormality: occasion.formalityLevel,
-    });
-
     const outfitItems = request.items.map((i) =>
       OutfitItem.create({
         wardrobeItemId: i.wardrobeItemId,
@@ -55,12 +44,29 @@ export class EvaluateVerdictUseCase implements IUseCase<
     const outfit = Outfit.create({
       userId: request.userId,
       occasionId: request.occasionId,
-      compatibilityScore: evaluation.score,
-      verdictText: evaluation.verdictText,
+      compatibilityScore: 0,
+      verdictText: "processing",
+      status: "pending",
       items: outfitItems,
     });
 
     const savedOutfit = await this.outfitRepo.save(outfit);
-    return OutfitDtoMapper.toVerdictDTO(savedOutfit);
+
+    await this.publisher.publishVerdictJob({
+      outfitId: savedOutfit.id,
+      items: request.items.map((item) => ({
+        imageUrl: item.imageUrl || "",
+        category: item.itemRole,
+        colorHex: item.colorHex || "",
+        formalityLevel: item.formalityLevel ?? occasion.formalityLevel,
+      })),
+      occasion: occasion.name,
+      occasionFormality: occasion.formalityLevel,
+    });
+
+    return {
+      outfitId: savedOutfit.id,
+      status: "processing",
+    };
   }
 }

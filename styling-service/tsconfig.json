@@ -21,9 +21,6 @@
     "module": "commonjs",
     "paths": {
       "@/*": ["./src/*"],
-      "bullmq": ["./src/bullmq"],
-      "@dolphjs/core": ["./src/@dolphjs/core"],
-      "@dolphjs/dolph": ["./src/@dolphjs/dolph"],
       "@/configs/*": ["./src/shared/configs/*"],
       "@/components/*": ["./src/components/*"],
       "@utils/*": ["./src/shared/utils/*"],

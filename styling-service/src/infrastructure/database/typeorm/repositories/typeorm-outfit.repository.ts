@@ -23,7 +23,10 @@ export class TypeOrmOutfitRepository implements IOutfitRepository {
   async findById(id: string): Promise<Outfit | null> {
     const found = await this.repo.findOne({
       where: { id },
-      relations: ["occasion", "items"] as any,
+      relations: {
+        occasion: true,
+        items: true,
+      },
     });
     return found ? OutfitPersistenceMapper.toDomain(found) : null;
   }
@@ -31,7 +34,10 @@ export class TypeOrmOutfitRepository implements IOutfitRepository {
   async findByUserId(userId: string): Promise<Outfit[]> {
     const found = await this.repo.find({
       where: { userId },
-      relations: ["occasion", "items"] as any,
+      relations: {
+        occasion: true,
+        items: true,
+      },
     });
     return found.map(OutfitPersistenceMapper.toDomain);
   }

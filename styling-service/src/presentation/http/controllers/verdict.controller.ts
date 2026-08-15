@@ -5,7 +5,6 @@ import {
   Post,
   Patch,
   Get,
-  DParam,
   DRes,
   Shield,
   DReq,
@@ -65,7 +64,8 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
   }
 
   @Patch(":id/complete")
-  async completeOutfit(@DParam("id") id: string, @DReq() req: any, @DRes() res: any) {
+  async completeOutfit(@DReq() req: any, @DRes() res: any) {
+    const id = req.params?.id;
     const body = req.body ?? {};
     const payloadId = req.payload?.id;
     if (payloadId !== "internal-service") {
@@ -129,7 +129,8 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
   }
 
   @Get(":id")
-  async getOutfitById(@DParam("id") id: string, @DReq() req: any, @DRes() res: any) {
+  async getOutfitById(@DReq() req: any, @DRes() res: any) {
+    const id = req.params?.id;
     const outfit = await this.outfitRepo.findById(id);
 
     if (!outfit) {

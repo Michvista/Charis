@@ -4,13 +4,51 @@ from typing import Any
 from django.conf import settings
 
 
-def upload_image_to_cloudinary(file: Any) -> str:
-    """Upload a file object to Cloudinary and return the secure URL."""
-    response = cloudinary.uploader.upload(file, folder="charis/wardrobe")
+def _extract_primary_color(response: dict[str, Any]) -> str | None:
+    """Normalize Cloudinary's dominant color response into a 6-digit hex string."""
+    colors = response.get("colors")
+    if not isinstance(colors, list) or not colors:
+        return None
+
+    top_color = colors[0]
+    candidate: Any = None
+
+    if isinstance(top_color, (list, tuple)) and top_color:
+        candidate = top_color[0]
+    elif isinstance(top_color, dict):
+        candidate = top_color.get("color") or top_color.get("hex")
+    elif isinstance(top_color, str):
+        candidate = top_color
+
+    if not isinstance(candidate, str):
+        return None
+
+    normalized = candidate.strip().lower()
+    if normalized.startswith("#") and len(normalized) == 9:
+        normalized = normalized[:7]
+
+    if normalized.startswith("#") and len(normalized) == 7:
+        return normalized
+
+    if len(normalized) == 6:
+        return f"#{normalized}"
+
+    return None
+
+
+def upload_image_to_cloudinary(file: Any) -> dict[str, str]:
+    """Upload a file object to Cloudinary and return the hosted URL plus dominant color."""
+    response = cloudinary.uploader.upload(file, folder="charis/wardrobe", colors=True)
     secure_url = response.get("secure_url")
     if not secure_url:
         raise ValueError("Cloudinary upload did not return a secure_url")
-    return secure_url
+
+    primary_color = _extract_primary_color(response) or "#808080"
+
+    return {
+        "secure_url": secure_url,
+        "primary_color": primary_color,
+    }
 
 
 def enqueue_tagging_job(item_id: str) -> None:

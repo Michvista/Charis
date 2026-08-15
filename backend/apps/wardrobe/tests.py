@@ -2,10 +2,12 @@ from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from apps.wardrobe.models import WardrobeItem, Season, WearLog
+from apps.wardrobe.services import upload_image_to_cloudinary
 from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 from unittest.mock import patch
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 User = get_user_model()
 
@@ -107,3 +109,61 @@ class WearLogApiTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(WearLog.objects.count(), 1)
+
+
+class WardrobeUploadTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="creator",
+            email="creator@example.com",
+            password="Password123!",
+        )
+        token = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token.access_token}")
+
+    @patch("apps.wardrobe.services.cloudinary.uploader.upload")
+    def test_cloudinary_upload_extracts_primary_color(self, mock_upload):
+        mock_upload.return_value = {
+            "secure_url": "https://res.cloudinary.com/demo/image/upload/v1/shirt.jpg",
+            "colors": [["#112233", 45.0], ["#ffffff", 10.0]],
+        }
+
+        result = upload_image_to_cloudinary(SimpleUploadedFile("shirt.jpg", b"fake-image-bytes"))
+
+        self.assertEqual(result["secure_url"], "https://res.cloudinary.com/demo/image/upload/v1/shirt.jpg")
+        self.assertEqual(result["primary_color"], "#112233")
+        mock_upload.assert_called_once()
+        self.assertTrue(mock_upload.call_args.kwargs["colors"])
+
+    @patch("apps.wardrobe.views.enqueue_tagging_job")
+    @patch("apps.wardrobe.views.upload_image_to_cloudinary")
+    def test_create_wardrobe_item_uses_extracted_primary_color(self, mock_upload, mock_enqueue):
+        mock_upload.return_value = {
+            "secure_url": "https://res.cloudinary.com/demo/image/upload/v1/tee.jpg",
+            "primary_color": "#445566",
+        }
+
+        image = SimpleUploadedFile(
+            "tee.jpg",
+            b"fake-image-bytes",
+            content_type="image/jpeg",
+        )
+
+        response = self.client.post(
+            "/api/wardrobe/items/",
+            {
+                "name": "Cloud Tee",
+                "category": "top",
+                "formality_level": 2,
+                "image": image,
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(WardrobeItem.objects.count(), 1)
+        item = WardrobeItem.objects.get()
+        self.assertEqual(item.primary_color, "#445566")
+        self.assertEqual(item.image_url, "https://res.cloudinary.com/demo/image/upload/v1/tee.jpg")
+        mock_enqueue.assert_called_once()

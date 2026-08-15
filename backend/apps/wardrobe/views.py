@@ -32,19 +32,33 @@ class WardrobeItemViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return WardrobeItem.objects.filter(user=self.request.user)
 
-    def perform_create(self, serializer):
-        # Check if an image file was uploaded
+    def create(self, request, *args, **kwargs):
+        payload = request.data.copy()
         image_file = self.request.FILES.get('image')
         image_url = ""
-        
-        if image_file:
-            image_url = upload_image_to_cloudinary(image_file)
+        extracted_primary_color = None
 
-        # Save the item with the user and Cloudinary image URL
-        item = serializer.save(user=self.request.user, image_url=image_url)
+        if image_file:
+            upload_result = upload_image_to_cloudinary(image_file)
+            image_url = upload_result["secure_url"]
+            extracted_primary_color = upload_result["primary_color"]
+
+        if not payload.get("primary_color") and extracted_primary_color:
+            payload["primary_color"] = extracted_primary_color
+
+        serializer = self.get_serializer(data=payload)
+        serializer.is_valid(raise_exception=True)
+
+        item = serializer.save(
+            user=self.request.user,
+            image_url=image_url,
+        )
 
         # Call service layer stub to enqueue auto-tagging
         enqueue_tagging_job(item.id)
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
     @action(detail=True, methods=['post'], url_path='wear')
     def log_wear(self, request, pk=None):

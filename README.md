@@ -236,7 +236,7 @@ GOOGLE_APPLICATION_CREDENTIALS=
 
 Building this fully in public — one video per completed phase.
 
-[Playlist link — coming soon]
+[Charis playlist](https://www.youtube.com/playlist?list=PLSv-9lHajHEs)
 
 ---
 

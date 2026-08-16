@@ -76,7 +76,8 @@ def retrieve_relevant_chunks(query: str, top_k: int = 5):
     for index, chunk in enumerate(chunks):
         prompt_lines.append(f"[{index}] tags={chunk.tags} content={chunk.content}")
 
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model_name = os.getenv("STYLEADVISOR_RETRIEVER_MODEL", os.getenv("STYLEADVISOR_MODEL", "gemini-2.5-flash"))
+    model = genai.GenerativeModel(model_name)
     response = model.generate_content("\n".join(prompt_lines))
     raw_text = getattr(response, "text", "") or ""
 

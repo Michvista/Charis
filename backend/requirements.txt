@@ -9,3 +9,4 @@ cloudinary
 django-cloudinary-storage
 redis
 dj-database-url
+google-generativeai

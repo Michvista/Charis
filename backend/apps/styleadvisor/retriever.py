@@ -1,55 +1,25 @@
 from __future__ import annotations
 
-import json
 import os
 import tempfile
 from pathlib import Path
 
-from django.conf import settings
-
+from .gemini_client import generate_gemini_text, upload_gemini_file
+from .json_utils import extract_json_array
 from .models import StyleKnowledgeChunk
 
 
-def _get_genai():
-    try:
-        import google.generativeai as genai
-    except ImportError as exc:  # pragma: no cover - dependency gate
-        raise RuntimeError(
-            "google-generativeai is not installed. Add it to requirements.txt and install dependencies."
-        ) from exc
-
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise RuntimeError("GEMINI_API_KEY is not configured.")
-
-    genai.configure(api_key=api_key)
-    return genai
-
-
-def _extract_json_array(raw_text: str) -> list[int]:
-    trimmed = raw_text.strip()
-    start = trimmed.find("[")
-    end = trimmed.rfind("]")
-    candidate = trimmed[start : end + 1] if start != -1 and end >= start else trimmed
-    parsed = json.loads(candidate)
-    if not isinstance(parsed, list):
-        raise ValueError("Gemini did not return a JSON array.")
-    return [int(value) for value in parsed]
-
-
 def upload_knowledge_chunk(content: str, tags: list):
-    genai = _get_genai()
-
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as handle:
         handle.write(content)
         temp_path = handle.name
 
     try:
-        uploaded = genai.upload_file(path=temp_path)
+        embedding_ref = upload_gemini_file(temp_path)
         chunk = StyleKnowledgeChunk.objects.create(
             content=content,
             tags=tags,
-            embedding_ref=getattr(uploaded, "uri", None) or getattr(uploaded, "name", "") or "",
+            embedding_ref=embedding_ref,
         )
         return chunk
     finally:
@@ -59,8 +29,7 @@ def upload_knowledge_chunk(content: str, tags: list):
             pass
 
 
-def retrieve_relevant_chunks(query: str, top_k: int = 5):
-    genai = _get_genai()
+def retrieve_relevant_chunks(query: str, top_k: int = 5, model_name: str | None = None):
     chunks = list(StyleKnowledgeChunk.objects.order_by("created_at"))
 
     if not chunks:
@@ -76,13 +45,14 @@ def retrieve_relevant_chunks(query: str, top_k: int = 5):
     for index, chunk in enumerate(chunks):
         prompt_lines.append(f"[{index}] tags={chunk.tags} content={chunk.content}")
 
-    model_name = os.getenv("STYLEADVISOR_RETRIEVER_MODEL", os.getenv("STYLEADVISOR_MODEL", "gemini-2.5-flash"))
-    model = genai.GenerativeModel(model_name)
-    response = model.generate_content("\n".join(prompt_lines))
-    raw_text = getattr(response, "text", "") or ""
+    selected_model = model_name or os.getenv(
+        "STYLEADVISOR_RETRIEVER_MODEL",
+        os.getenv("STYLEADVISOR_MODEL", "gemini-2.5-flash"),
+    )
+    raw_text = generate_gemini_text(selected_model, "\n".join(prompt_lines))
 
     try:
-        indices = _extract_json_array(raw_text)
+        indices = [int(value) for value in extract_json_array(raw_text)]
     except Exception:
         indices = list(range(min(top_k, len(chunks))))
 

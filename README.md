@@ -2,15 +2,15 @@
 
 A wardrobe operating system. Digitize your closet once — get AI-powered outfit verdicts, generate combinations from your real wardrobe, plan trip packing lists, and track how you actually wear your clothes over time.
 
-Built in public. Every phase documented on [YouTube](#).
+Built in public. Every phase documented on [YouTube](https://www.youtube.com/playlist?list=PLSv-9lHajHEs).
 
 ---
 
 ## What it does
 
-**Styling verdict** — Upload two items, describe the occasion, get an AI verdict on whether the outfit works, what accessories to add, and alternative combinations.
+**Styling verdict** — Upload outfit images, describe the occasion, and get a Gemini vision verdict on whether the outfit works, what is clashing, and how confident the AI is.
 
-**Outfit generator** — Let the AI build full outfits from your existing wardrobe given an occasion and formality level. Uses a backtracking constraint-satisfaction algorithm to prune invalid combinations before scoring them.
+**Outfit generator** — Build full outfits from your existing wardrobe given an occasion and formality level. The styling service uses a backtracking constraint-satisfaction algorithm plus a weighted compatibility graph before the worker reranks the strongest candidates with Gemini vision.
 
 **Trip packing list** — Add a trip with multiple events. A greedy set-cover algorithm selects the minimum wardrobe items that cover every event with at least one valid outfit.
 
@@ -19,6 +19,8 @@ Built in public. Every phase documented on [YouTube](#).
 **Analytics dashboard** — Cost-per-wear, wear frequency over time, color distribution, category breakdown. All computed from real wear logs, not manual counters.
 
 **Complete the look** — RAG-powered suggestions for what to buy when your wardrobe is missing a piece for an occasion.
+
+**Notifications worker** — BullMQ worker that deduplicates reminder notifications with Redis so the same alert is not sent twice inside the one-hour dedupe window.
 
 ---
 
@@ -37,11 +39,11 @@ Shared infrastructure: **Postgres** · **Redis**
 
 ### Why this split
 
-Django owns the data backbone — wardrobe items, wear logs, trips, social records. Everything that is a persistent record of the user's real world.
+Django owns the data backbone: wardrobe items, wear logs, trips, social records, analytics summaries, and the style-advisor output that needs to be persisted.
 
-DolphJS owns the intelligence layer — the part with the interesting logic. The backtracking combo generator, graph-based compatibility scoring, and AI verdict calls all live in the styling-service. This is also where DolphJS's Spring OOP paradigm gets a full domain to operate in, not just a footnote service.
+DolphJS owns the outfit intelligence layer: occasions, outfit verdicts, combo generation, and the internal endpoints the worker calls back into.
 
-The job-worker exists because AI calls are slow. Neither Django nor DolphJS blocks on them — they enqueue a job to Redis, the worker processes it asynchronously and calls back with the result.
+The job-worker exists because AI calls are slow. Neither Django nor DolphJS blocks on them. They enqueue work to Redis, the worker processes it asynchronously, and then patches the result back into the owning service.
 
 ```
 frontend
@@ -61,6 +63,8 @@ job-worker
 frontend poll resolves → renders verdict
 ```
 
+The worker side also includes a notifications queue that deduplicates repeated reminders using a Redis key with a one-hour expiry.
+
 ---
 
 ## Stack
@@ -76,7 +80,7 @@ frontend poll resolves → renders verdict
 | Database        | PostgreSQL                              |
 | Image storage   | Cloudinary                              |
 | AI              | Groq / Gemini Vision                    |
-| RAG             | Google File Store                       |
+| RAG             | Gemini File Store + retrieved style chunks |
 | Containers      | Docker · Docker Compose                 |
 
 ---
@@ -237,6 +241,13 @@ GOOGLE_APPLICATION_CREDENTIALS=
 Building this fully in public — one video per completed phase.
 
 [Charis playlist](https://www.youtube.com/playlist?list=PLSv-9lHajHEs)
+
+---
+
+## API docs
+
+- [Backend API](backend/API.md)
+- [Styling service API](styling-service/API.md)
 
 ---
 

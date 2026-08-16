@@ -5,11 +5,14 @@ import {
   Route,
   Post,
   Get,
-  DReq,
   DRes,
   Shield,
+  DBody,
 } from "@dolphjs/dolph/decorators";
-import { CreateOccasionDTO } from "../../../application/occasion/dtos/occasion.dto";
+import {
+  CreateOccasionBodyDto,
+  CreateOccasionDTO,
+} from "../../../application/occasion/dtos/occasion.dto";
 import { CreateOccasionUseCase } from "../../../application/occasion/use-cases/create-occasion.use-case";
 import { TypeOrmOccasionRepository } from "../../../infrastructure/database/typeorm/repositories/typeorm-occasion.repository";
 import { authShield } from "../shields/auth.shield";
@@ -27,9 +30,13 @@ export class OccasionController extends DolphControllerHandler<Dolph> {
   }
 
   @Post()
-  async create(@DReq() req: any, @DRes() res: any) {
-    const body = (req.body ?? {}) as CreateOccasionDTO;
-    const result = await this.createOccasionUseCase.execute(body);
+  async create(
+    @DBody(CreateOccasionBodyDto)
+    body: CreateOccasionBodyDto,
+    @DRes() res: any,
+  ) {
+    const request = body as unknown as CreateOccasionDTO;
+    const result = await this.createOccasionUseCase.execute(request);
 
     if (result.isFailure) {
       return res.status(400).json({ status: "fail", message: result.error });

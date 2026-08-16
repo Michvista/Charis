@@ -1,6 +1,9 @@
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from .models import Comment, OutfitShare, Vote
+from .models import Comment, Friendship, OutfitShare, Vote
+
+User = get_user_model()
 
 
 class CommentSerializer(serializers.ModelSerializer):
@@ -71,3 +74,53 @@ class OutfitShareSerializer(serializers.ModelSerializer):
         upvotes = obj.votes.filter(value=1).count()
         downvotes = obj.votes.filter(value=-1).count()
         return {"upvotes": upvotes, "downvotes": downvotes}
+
+
+class FriendshipSerializer(serializers.ModelSerializer):
+    requester_email = serializers.EmailField(source="requester.email", read_only=True)
+    addressee_email = serializers.EmailField(source="addressee.email", read_only=True)
+    friend_user_id = serializers.UUIDField(write_only=True, required=True)
+
+    class Meta:
+        model = Friendship
+        fields = [
+            "id",
+            "requester",
+            "requester_email",
+            "addressee",
+            "addressee_email",
+            "friend_user_id",
+            "status",
+            "accepted_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "requester",
+            "requester_email",
+            "addressee",
+            "addressee_email",
+            "status",
+            "accepted_at",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_friend_user_id(self, value):
+        if self.context.get("request") and str(self.context["request"].user.id) == str(value):
+            raise serializers.ValidationError("You cannot friend yourself.")
+        if not User.objects.filter(id=value).exists():
+            raise serializers.ValidationError("User not found.")
+        return value
+
+    def create(self, validated_data):
+        friend_user_id = validated_data.pop("friend_user_id")
+        addressee = User.objects.get(id=friend_user_id)
+        requester = self.context["request"].user
+        friendship, _ = Friendship.objects.get_or_create(
+            requester=requester,
+            addressee=addressee,
+            defaults={"status": Friendship.Status.PENDING},
+        )
+        return friendship

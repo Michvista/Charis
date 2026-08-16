@@ -3,7 +3,7 @@
 import { BaseEntity } from "../../../shared/domain/entity.base";
 
 export interface OccasionProps {
-  name: string;
+  name: string; 
   formalityLevel: number;
 }
 

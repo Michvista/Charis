@@ -2,7 +2,7 @@
 
 export type OutfitRole =
   | "TOP"
-  | "BOTTOM"
+  | "BOTTOM" 
   | "SHOES"
   | "OUTERWEAR"
   | "ACCESSORY";
@@ -115,10 +115,10 @@ export class StyleCompatibilityService {
     let score = 0;
     const normalizedRoles = items.map((item) =>
       this.normalizeRole(item.category).toString(),
-    );
+    ); // top -> TOP
 
     for (let i = 0; i < normalizedRoles.length; i += 1) {
-      for (let j = i + 1; j < normalizedRoles.length; j += 1) {
+      for (let j = i + 1; j < normalizedRoles.length; j += 1) {   // [TOP, BOTTOM, SHOES] -> [TOP + BOTTOM, TOP+ SHOES, BOTTOM + SHOES]
         const left = normalizedRoles[i];
         const right = normalizedRoles[j];
         const edgeScore =
@@ -327,14 +327,14 @@ export class StyleCompatibilityService {
   }
 
   public evaluateColorPair(colorA: string, colorB: string): number {
-    const parsedA = this.parseColor(colorA);
+    const parsedA = this.parseColor(colorA); // #FFF HEX -> HSL
     const parsedB = this.parseColor(colorB);
 
     if (!parsedA || !parsedB) {
       return 0;
     }
 
-    const hueDiff = this.circularDistance(parsedA.h, parsedB.h);
+    const hueDiff = this.circularDistance(parsedA.h, parsedB.h);  // HUE -> ; SATUR -> ; LIG -> 
     const saturationDiff = Math.abs(parsedA.s - parsedB.s);
     const lightnessDiff = Math.abs(parsedA.l - parsedB.l);
     const neutralA = this.isNeutral(parsedA, colorA);

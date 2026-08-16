@@ -3,14 +3,18 @@ import { Worker } from "bullmq";
 import { startTaggingWorker } from "./processors/tagging.processor";
 import { startComboWorker } from "./processors/combo.processor";
 import { startVerdictWorker } from "./processors/verdict.processor";
+import { startNotificationsWorker } from "./notifications/notification.worker";
 
 const workers: Worker[] = [
   startTaggingWorker(),
   startComboWorker(),
   startVerdictWorker(),
+  startNotificationsWorker(),
 ];
 
-console.log("job-worker listening on queues: wardrobe-tagging, combo-generation, outfit-verdict");
+console.log(
+  "job-worker listening on queues: wardrobe-tagging, combo-generation, outfit-verdict, notifications",
+);
 
 async function shutdown(signal: string): Promise<void> {
   console.log(`[job-worker] received ${signal}, closing workers...`);

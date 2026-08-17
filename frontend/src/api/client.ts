@@ -1,5 +1,10 @@
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000/api';
-const STYLING_URL = process.env.NEXT_PUBLIC_STYLING_URL ?? 'http://localhost:3000';
+// Use relative URL so Next.js proxy rewrites handle CORS transparently.
+// next.config.ts rewrites /api/* → http://localhost:8000/api/*
+const IS_SERVER = typeof window === 'undefined';
+const BACKEND_URL = IS_SERVER
+  ? (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000/api')
+  : '/api';
+const STYLING_URL = process.env.NEXT_PUBLIC_STYLING_URL ?? 'http://localhost:3300';
 
 const TOKEN_KEY = 'charis.access_token';
 const REFRESH_KEY = 'charis.refresh_token';

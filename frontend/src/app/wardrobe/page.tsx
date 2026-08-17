@@ -513,26 +513,37 @@ export default function WardrobePage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-3">
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-semibold text-[#544342]">Primary Color (fallback)</label>
+                        <label className="text-xs font-semibold text-[#544342]">Primary Color</label>
                         <input
                           type="text"
                           value={newItemColor}
                           onChange={(e) => setNewItemColor(e.target.value)}
-                          placeholder="e.g. Camel or #c4a882"
+                          placeholder="e.g. Camel"
                           className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
                         />
                       </div>
 
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-semibold text-[#544342]">Formality Level (1-5)</label>
+                        <label className="text-xs font-semibold text-[#544342]">Formality (1-5)</label>
                         <input
                           type="number"
                           min="1"
                           max="5"
                           value={newItemFormality}
                           onChange={(e) => setNewItemFormality(Number(e.target.value))}
+                          className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-[#544342]">Purchase Price ($)</label>
+                        <input
+                          type="text"
+                          value={newItemPrice}
+                          onChange={(e) => setNewItemPrice(e.target.value)}
+                          placeholder="e.g. 150.00"
                           className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
                         />
                       </div>

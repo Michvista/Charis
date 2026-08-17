@@ -340,7 +340,14 @@ export default function AdvisorPage() {
                             <p className="serif text-sm font-bold text-[#1e1b18] truncate">{item.item_description}</p>
                             <p className="text-[11px] text-[#867272]">{item.priority} priority</p>
                           </div>
-                          <div className="flex gap-2 shrink-0">
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              onClick={() => handleAddAsDraft(item)}
+                              disabled={addingDraft}
+                              className="text-xs bg-[#380208] text-white px-2.5 py-1 rounded font-semibold hover:bg-[#54161b] transition-colors flex items-center gap-1 disabled:opacity-50"
+                            >
+                              <Plus size={12} /> Draft
+                            </button>
                             <button
                               onClick={() => { setActiveItem(item); setShowWishlistModal(false); }}
                               className="text-xs text-[#380208] font-semibold hover:underline"

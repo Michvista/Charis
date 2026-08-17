@@ -16,13 +16,15 @@ import {
   ResponsiveContainer,
   Tooltip,
   Cell,
-  PieChart as RechartsPieChart,
-  Pie,
-  Legend,
+  RadarChart,
+  Radar,
+  PolarGrid,
+  PolarAngleAxis,
 } from 'recharts';
 import type { AnalyticsOverview, WardrobeItem } from '@/lib/types';
 
 const CATEGORY_COLORS = ['#380208', '#54161b', '#867272', '#5e5e5b', '#191810', '#d9c1c0', '#867272'];
+const DEFAULT_CATEGORIES = ['top', 'bottom', 'outerwear', 'shoes', 'accessory'];
 
 export default function AnalyticsPage() {
   const { session } = useAuth();
@@ -53,22 +55,30 @@ export default function AnalyticsPage() {
       ? (parseFloat(mostWorn.purchase_price) / mostWorn.times_worn).toFixed(2)
       : '0.00';
 
-  // Build category breakdown from real wardrobe if analytics doesn't have it
-  const categoryBreakdown: Array<{ category: string; count: number }> = (() => {
-    if (analytics?.category_breakdown?.length) return analytics.category_breakdown;
-    const map: Record<string, number> = {};
-    wardrobeItems.forEach((i) => {
-      const cat = i.category || 'other';
-      map[cat] = (map[cat] || 0) + 1;
-    });
-    return Object.entries(map).map(([category, count]) => ({ category, count }));
-  })();
+  // Category breakdown for Radar Chart
+  const categoryCountMap: Record<string, number> = {};
+  wardrobeItems.forEach((i) => {
+    const cat = i.category?.toLowerCase() || 'other';
+    categoryCountMap[cat] = (categoryCountMap[cat] || 0) + 1;
+  });
 
-  const pieData = categoryBreakdown.map((c, i) => ({
-    name: c.category?.charAt(0).toUpperCase() + c.category?.slice(1) || 'Other',
-    value: c.count,
-    fill: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
-  }));
+  // Ensure all standard radar subjects are present
+  const radarSubjects = DEFAULT_CATEGORIES.map((cat) => {
+    return {
+      subject: cat.toUpperCase(),
+      value: categoryCountMap[cat] || 0,
+    };
+  });
+
+  // Add any non-standard categories if they exist
+  Object.keys(categoryCountMap).forEach((cat) => {
+    if (!DEFAULT_CATEGORIES.includes(cat)) {
+      radarSubjects.push({
+        subject: cat.toUpperCase(),
+        value: categoryCountMap[cat],
+      });
+    }
+  });
 
   const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const barData = weekDays.map((day, i) => ({
@@ -139,7 +149,7 @@ export default function AnalyticsPage() {
 
           {/* Charts Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Pie Category Distribution — uses real wardrobe data */}
+            {/* Radar Category Distribution */}
             <div className="bg-white rounded-2xl p-6 border border-[#d9c1c0] shadow-sm flex flex-col gap-4">
               <div className="flex justify-between items-center border-b border-[#d9c1c0]/40 pb-3">
                 <span className="eyebrow">Category Distribution</span>
@@ -150,31 +160,16 @@ export default function AnalyticsPage() {
                 <div className="h-72 flex items-center justify-center">
                   <div className="w-8 h-8 border-2 border-[#380208] border-t-transparent rounded-full animate-spin" />
                 </div>
-              ) : pieData.length === 0 ? (
-                <div className="h-72 flex flex-col items-center justify-center text-center gap-2">
-                  <PieChart size={36} className="text-[#d9c1c0]" />
-                  <p className="text-xs text-[#867272] italic">Add garments to your library to see category breakdown.</p>
-                </div>
               ) : (
                 <>
-                  <div className="h-72 w-full">
+                  <div className="h-72 min-h-[280px] w-full flex items-center justify-center relative">
                     <ResponsiveContainer width="100%" height={280}>
-                      <RechartsPieChart>
-                        <Pie
-                          data={pieData}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={90}
-                          dataKey="value"
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                          labelLine={false}
-                        >
-                          {pieData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                          ))}
-                        </Pie>
+                      <RadarChart data={radarSubjects} cx="50%" cy="50%" outerRadius={90}>
+                        <PolarGrid stroke="#d9c1c0" />
+                        <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11, fill: '#1e1b18', fontWeight: 600 }} />
+                        <Radar dataKey="value" stroke="#380208" fill="#380208" fillOpacity={0.25} strokeWidth={2} />
                         <Tooltip
-                          formatter={(value: any, name: string) => [`${value} items`, name]}
+                          formatter={(val: any) => [`${val} items`, 'Count']}
                           contentStyle={{
                             background: '#1e1b18',
                             color: '#ffffff',
@@ -183,15 +178,15 @@ export default function AnalyticsPage() {
                             fontSize: '12px',
                           }}
                         />
-                      </RechartsPieChart>
+                      </RadarChart>
                     </ResponsiveContainer>
                   </div>
 
                   <div className="flex gap-3 flex-wrap justify-center border-t border-[#d9c1c0]/40 pt-3">
-                    {pieData.map((c) => (
-                      <div key={c.name} className="flex items-center gap-1.5 text-xs text-[#544342]">
-                        <span className="w-2.5 h-2.5 rounded-full" style={{ background: c.fill }} />
-                        <span className="capitalize font-medium">{c.name}: {c.value}</span>
+                    {radarSubjects.map((c, i) => (
+                      <div key={c.subject} className="flex items-center gap-1.5 text-xs text-[#544342]">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ background: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }} />
+                        <span className="capitalize font-medium">{c.subject}: {c.value}</span>
                       </div>
                     ))}
                   </div>

@@ -51,9 +51,14 @@ export async function createFriendship(token: string, friendUserId: string): Pro
 }
 
 export async function listFriendships(token: string): Promise<Friendship[]> {
-  const res = await requestBackend<any>('/social/friendships/', {
-    method: 'GET',
-    token,
-  });
-  return Array.isArray(res) ? res : (res?.results ?? []);
+  try {
+    const res = await requestBackend<any>('/social/friendships/', {
+      method: 'GET',
+      token,
+    });
+    return Array.isArray(res) ? res : (res?.results ?? []);
+  } catch (err) {
+    console.warn('Friendships API unavailable, returning empty list', err);
+    return [];
+  }
 }

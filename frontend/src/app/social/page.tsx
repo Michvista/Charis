@@ -86,30 +86,53 @@ export default function SocialPage() {
 
   const handleVote = async (shareId: string) => {
     if (!session?.accessToken) return;
-    // Prevent double-clicking same post
-    if (likedPosts.has(shareId) || votingPosts.has(shareId)) {
-      toastError('Already Liked', 'You have already liked this post.');
-      return;
-    }
+    if (votingPosts.has(shareId)) return;
 
+    const isCurrentlyLiked = likedPosts.has(shareId);
     setVotingPosts((prev) => new Set([...prev, shareId]));
+
     try {
-      await voteShare(session.accessToken, shareId, 1);
-      setLikedPosts((prev) => new Set([...prev, shareId]));
-      setShares((prev) =>
-        prev.map((s) =>
-          s.id === shareId
-            ? {
-                ...s,
-                vote_count: (s.vote_count || 0) + 1,
-                vote_breakdown: {
-                  upvotes: (s.vote_breakdown?.upvotes || 0) + 1,
-                  downvotes: s.vote_breakdown?.downvotes || 0,
-                },
-              }
-            : s
-        )
-      );
+      if (isCurrentlyLiked) {
+        await voteShare(session.accessToken, shareId, -1);
+        setLikedPosts((prev) => {
+          const next = new Set(prev);
+          next.delete(shareId);
+          return next;
+        });
+        setShares((prev) =>
+          prev.map((s) =>
+            s.id === shareId
+              ? {
+                  ...s,
+                  vote_count: Math.max(0, (s.vote_count || 1) - 1),
+                  vote_breakdown: {
+                    upvotes: Math.max(0, (s.vote_breakdown?.upvotes || 1) - 1),
+                    downvotes: s.vote_breakdown?.downvotes || 0,
+                  },
+                }
+              : s
+          )
+        );
+        toastSuccess('Unliked Post', 'Removed your upvote.');
+      } else {
+        await voteShare(session.accessToken, shareId, 1);
+        setLikedPosts((prev) => new Set([...prev, shareId]));
+        setShares((prev) =>
+          prev.map((s) =>
+            s.id === shareId
+              ? {
+                  ...s,
+                  vote_count: (s.vote_count || 0) + 1,
+                  vote_breakdown: {
+                    upvotes: (s.vote_breakdown?.upvotes || 0) + 1,
+                    downvotes: s.vote_breakdown?.downvotes || 0,
+                  },
+                }
+              : s
+          )
+        );
+        toastSuccess('Liked Post', 'Upvote added to look.');
+      }
     } catch (err) {
       toastError('Vote Failed', err instanceof Error ? err.message : 'Could not register vote.');
     } finally {
@@ -322,8 +345,8 @@ export default function SocialPage() {
                           <div className="flex gap-5">
                             <button
                               onClick={() => handleVote(share.id)}
-                              disabled={isLiked || isVoting}
-                              className={`flex items-center gap-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed ${
+                              disabled={isVoting}
+                              className={`flex items-center gap-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
                                 isLiked ? 'text-red-600' : 'text-[#544342] hover:text-red-700'
                               }`}
                             >

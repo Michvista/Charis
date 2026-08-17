@@ -30,7 +30,10 @@ type FetchOptions = Omit<RequestInit, 'body'> & {
 
 function makeUrl(base: string, path: string) {
   const cleanBase = base.replace(/\/+$/, '');
-  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  let cleanPath = path.startsWith('/') ? path : `/${path}`;
+  if (!cleanPath.endsWith('/') && !cleanPath.includes('?') && !cleanPath.includes('.')) {
+    cleanPath += '/';
+  }
   return `${cleanBase}${cleanPath}`;
 }
 

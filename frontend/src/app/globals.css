@@ -45,6 +45,19 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Interactive elements default to cursor: pointer */
+button,
+a,
+select,
+input[type="submit"],
+input[type="button"],
+input[type="checkbox"],
+input[type="radio"],
+[role="button"],
+.cursor-pointer {
+  cursor: pointer;
+}
+
 .serif {
   font-family: var(--font-serif);
 }

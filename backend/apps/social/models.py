@@ -59,7 +59,7 @@ class Friendship(TimeStampedModel):
         ordering = ["-created_at"]
         constraints = [
             models.CheckConstraint(
-                check=~Q(requester=models.F("addressee")),
+                condition=~Q(requester=models.F("addressee")),
                 name="social_friendship_not_self_referential",
             ),
             models.UniqueConstraint(

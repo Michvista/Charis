@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { useAuth } from '@/lib/context/AuthContext';
-import { listWardrobeItems } from '@/api/wardrobe.api';
-import { demoWardrobe } from '@/data/demo';
+import { useToast } from '@/lib/context/ToastContext';
+import { listWardrobeItems, createWardrobeItem, deleteWardrobeItem, logWear } from '@/api/wardrobe.api';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Filter, Upload, X } from 'lucide-react';
+import { Filter, Plus, X, Trash2, Shirt, Sparkles, Tag, Calendar, DollarSign, Eye } from 'lucide-react';
 import type { WardrobeItem } from '@/lib/types';
 
 function WearDots({ count }: { count: number }) {
@@ -23,121 +23,431 @@ function WearDots({ count }: { count: number }) {
   );
 }
 
+const CATEGORIES = ['All', 'top', 'bottom', 'outerwear', 'shoes', 'accessory'];
+
 export default function WardrobePage() {
   const { session } = useAuth();
-  const [items, setItems] = useState<WardrobeItem[]>(demoWardrobe);
+  const { toastSuccess, toastError } = useToast();
+
+  const [items, setItems] = useState<WardrobeItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<WardrobeItem | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [sortBy, setSortBy] = useState<'newest' | 'wears' | 'name'>('newest');
+
+  // Add Item Modal state
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemCategory, setNewItemCategory] = useState('top');
+  const [newItemBrand, setNewItemBrand] = useState('');
+  const [newItemColor, setNewItemColor] = useState('black');
+  const [newItemFormality, setNewItemFormality] = useState(3);
+  const [newItemPrice, setNewItemPrice] = useState('150.00');
+  const [newItemImageUrl, setNewItemImageUrl] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchItems = async () => {
+    if (!session?.accessToken) return;
+    setLoading(true);
+    try {
+      const data = await listWardrobeItems(session.accessToken);
+      setItems(Array.isArray(data) ? data : []);
+    } catch {
+      toastError('Failed to fetch wardrobe', 'Could not load your items.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!session?.accessToken) return;
-    listWardrobeItems(session.accessToken).then(data => {
-      if (data.length) setItems(data);
-    }).catch(() => {});
+    fetchItems();
   }, [session]);
+
+  const handleAddItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!session?.accessToken || !newItemName.trim()) return;
+
+    setSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append('name', newItemName.trim());
+      formData.append('category', newItemCategory);
+      formData.append('brand', newItemBrand.trim() || 'Charis Collection');
+      formData.append('primary_color', newItemColor);
+      formData.append('formality_level', String(newItemFormality));
+      formData.append('purchase_price', newItemPrice);
+      formData.append('purchase_date', new Date().toISOString().split('T')[0]);
+      if (newItemImageUrl.trim()) {
+        formData.append('image_url', newItemImageUrl.trim());
+      }
+
+      await createWardrobeItem(session.accessToken, formData);
+      toastSuccess('Item Added', `"${newItemName}" has been curated to your wardrobe.`);
+      setShowAddModal(false);
+      // Reset form
+      setNewItemName('');
+      setNewItemBrand('');
+      setNewItemImageUrl('');
+      fetchItems();
+    } catch (err) {
+      toastError('Failed to add item', err instanceof Error ? err.message : 'Error adding wardrobe item.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteItem = async (id: string, name: string) => {
+    if (!session?.accessToken) return;
+    if (!confirm(`Are you sure you want to remove "${name}" from your collection?`)) return;
+
+    try {
+      await deleteWardrobeItem(session.accessToken, id);
+      toastSuccess('Item Removed', `"${name}" was deleted from your collection.`);
+      setSelected(null);
+      fetchItems();
+    } catch (err) {
+      toastError('Delete Failed', err instanceof Error ? err.message : 'Could not delete item.');
+    }
+  };
+
+  const handleLogWear = async (id: string, name: string) => {
+    if (!session?.accessToken) return;
+    try {
+      await logWear(session.accessToken, id);
+      toastSuccess('Wear Logged', `Logged +1 wear for "${name}".`);
+      fetchItems();
+      if (selected?.id === id) {
+        setSelected(prev => prev ? { ...prev, times_worn: (prev.times_worn || 0) + 1 } : null);
+      }
+    } catch (err) {
+      toastError('Log Wear Failed', err instanceof Error ? err.message : 'Could not log wear.');
+    }
+  };
+
+  const filteredItems = useMemo(() => {
+    let list = items;
+    if (categoryFilter !== 'All') {
+      list = list.filter(i => i.category?.toLowerCase() === categoryFilter.toLowerCase());
+    }
+    return [...list].sort((a, b) => {
+      if (sortBy === 'wears') return (b.times_worn || 0) - (a.times_worn || 0);
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    });
+  }, [items, categoryFilter, sortBy]);
 
   return (
     <AuthGuard>
       <AppShell>
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-6">
-          <div className="flex justify-between items-end">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-8">
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
-              <h1 className="serif text-4xl font-semibold text-[#1e1b18]">Library</h1>
-              <p className="text-sm text-[#544342] mt-1">{items.length} Items curated in your collection.</p>
+              <div className="flex items-center gap-2 text-xs font-semibold tracking-widest uppercase text-[#867272]">
+                <span className="w-6 h-px bg-[#d9c1c0]" />
+                Personal Archive
+              </div>
+              <h1 className="serif text-4xl font-bold text-[#1e1b18] mt-1">Library</h1>
+              <p className="text-sm text-[#544342]">
+                {items.length} {items.length === 1 ? 'item' : 'items'} curated in your collection.
+              </p>
             </div>
-            <div className="flex gap-2.5">
-              <button className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-[#d9c1c0] text-sm font-medium text-[#1e1b18] bg-white hover:border-[#380208] transition-colors">
-                <Filter size={14} /> Filter
-              </button>
-              <button className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#380208] text-white text-sm font-semibold hover:opacity-90 transition-all hover:-translate-y-0.5">
-                <Upload size={14} /> Upload
+
+            <div className="flex items-center gap-3">
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value as any)}
+                className="px-3 py-2 bg-white border border-[#d9c1c0] rounded-lg text-xs font-semibold text-[#1e1b18] outline-none focus:border-[#380208] cursor-pointer"
+              >
+                <option value="newest">Sort: Newest First</option>
+                <option value="wears">Sort: Most Worn</option>
+                <option value="name">Sort: Alphabetical</option>
+              </select>
+
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#380208] text-white text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all hover:-translate-y-0.5 shadow-md shadow-[#380208]/20"
+              >
+                <Plus size={16} /> Add Item
               </button>
             </div>
           </div>
 
+          {/* Category Filter Tabs */}
+          <div className="flex items-center gap-2 border-b border-[#d9c1c0] overflow-x-auto pb-1">
+            {CATEGORIES.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setCategoryFilter(cat)}
+                className={`px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-colors border-b-2 -mb-[5px] whitespace-nowrap ${
+                  categoryFilter === cat
+                    ? 'border-[#380208] text-[#380208]'
+                    : 'border-transparent text-[#867272] hover:text-[#1e1b18]'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Content Grid / Empty State */}
           <div className="flex gap-6">
-            <div className={`grid gap-4 flex-1 align-start ${selected ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-3'}`}>
-              {items.map((item, i) => (
-                <motion.div
-                  key={item.id}
-                  className={`cursor-pointer flex flex-col gap-2.5 transition-transform hover:-translate-y-1 ${
-                    selected?.id === item.id ? 'ring-2 ring-[#380208] ring-offset-2 rounded-lg' : ''
-                  }`}
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.04 }}
-                  onClick={() => setSelected(selected?.id === item.id ? null : item)}
-                >
-                  <div className="relative aspect-[3/4] rounded-lg overflow-hidden bg-[#f5ece7]">
-                    <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
-                    <span className="absolute top-2 right-2 bg-white/90 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider">
-                      {item.seasons?.[0]?.name?.slice(0, 2).toUpperCase() ?? 'AL'}
-                    </span>
+            <div className={`flex-1 ${filteredItems.length ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6' : ''}`}>
+              {loading ? (
+                <div className="col-span-full py-20 flex justify-center items-center">
+                  <div className="w-8 h-8 border-2 border-[#380208]/30 border-t-[#380208] rounded-full animate-spin" />
+                </div>
+              ) : filteredItems.length === 0 ? (
+                <div className="col-span-full py-20 bg-white/60 border border-dashed border-[#d9c1c0] rounded-2xl flex flex-col items-center justify-center text-center p-8">
+                  <div className="w-16 h-16 rounded-full bg-[#fbf2ed] text-[#380208] grid place-items-center mb-4">
+                    <Shirt size={28} />
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <div className="flex justify-between items-center">
-                      <h3 className="serif text-base font-semibold text-[#1e1b18]">{item.name}</h3>
-                      <span className="w-2.5 h-2.5 rounded-full border border-black/10 flex-shrink-0" style={{ background: item.primary_color }} />
+                  <h3 className="serif text-2xl font-semibold text-[#1e1b18]">Your library is empty</h3>
+                  <p className="text-xs text-[#544342] max-w-sm mt-1 mb-6">
+                    No wardrobe items found in this view. Start building your capsule by adding your first garment.
+                  </p>
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    className="px-6 py-3 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] shadow-md shadow-[#380208]/20 transition-all hover:-translate-y-0.5"
+                  >
+                    + Add Your First Item
+                  </button>
+                </div>
+              ) : (
+                filteredItems.map((item, i) => (
+                  <motion.div
+                    key={item.id}
+                    className={`cursor-pointer flex flex-col gap-3 group transition-all ${
+                      selected?.id === item.id ? 'ring-2 ring-[#380208] ring-offset-4 rounded-xl' : ''
+                    }`}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.04 }}
+                    onClick={() => setSelected(selected?.id === item.id ? null : item)}
+                  >
+                    <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-[#f5ece7] shadow-sm group-hover:shadow-lg transition-all">
+                      <img
+                        src={item.image_url || 'https://images.unsplash.com/photo-1544441893-675973e31985?w=1080&q=90'}
+                        alt={item.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <span className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase text-[#1e1b18]">
+                        {item.category}
+                      </span>
                     </div>
-                    <p className="text-xs text-[#544342]">{item.category}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <WearDots count={item.times_worn} />
-                      <span className="text-[11px] text-[#544342]">{item.times_worn} Wears</span>
+
+                    <div className="flex flex-col gap-1 px-1">
+                      <div className="flex justify-between items-center">
+                        <h3 className="serif text-base font-semibold text-[#1e1b18] group-hover:text-[#380208] transition-colors">
+                          {item.name}
+                        </h3>
+                        {item.primary_color && (
+                          <span
+                            className="w-3 h-3 rounded-full border border-black/10 shrink-0"
+                            style={{ background: item.primary_color }}
+                          />
+                        )}
+                      </div>
+                      <p className="text-xs text-[#867272]">{item.brand || 'Charis'}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <WearDots count={item.times_worn || 0} />
+                        <span className="text-[11px] text-[#544342] font-medium">{item.times_worn || 0} Wears</span>
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                ))
+              )}
             </div>
 
+            {/* Item Details Slide-Over Drawer */}
             <AnimatePresence>
               {selected && (
                 <motion.div
-                  className="w-72 flex-shrink-0 bg-white rounded-xl border border-[#e1d8d4] p-5 sticky top-6 self-start flex flex-col gap-4 shadow-xl"
-                  initial={{ x: 40, opacity: 0 }}
+                  className="w-80 shrink-0 bg-white rounded-2xl border border-[#d9c1c0] p-6 sticky top-6 self-start flex flex-col gap-5 shadow-2xl z-20"
+                  initial={{ x: 50, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
-                  exit={{ x: 40, opacity: 0 }}
+                  exit={{ x: 50, opacity: 0 }}
                   transition={{ type: 'spring', damping: 25 }}
                 >
-                  <div className="flex justify-between items-center">
-                    <h2 className="serif text-xl font-semibold text-[#1e1b18]">Item Details</h2>
-                    <button onClick={() => setSelected(null)} className="text-[#544342] hover:text-[#380208]"><X size={18} /></button>
+                  <div className="flex justify-between items-center border-b border-[#d9c1c0]/50 pb-3">
+                    <h2 className="serif text-xl font-bold text-[#1e1b18]">Item Specification</h2>
+                    <button onClick={() => setSelected(null)} className="text-[#867272] hover:text-[#380208]">
+                      <X size={18} />
+                    </button>
                   </div>
-                  <div className="rounded-lg overflow-hidden aspect-square">
-                    <img src={selected.image_url} alt={selected.name} className="w-full h-full object-cover" />
+
+                  <div className="rounded-xl overflow-hidden aspect-square shadow-inner bg-[#f5ece7]">
+                    <img
+                      src={selected.image_url || 'https://images.unsplash.com/photo-1544441893-675973e31985?w=1080&q=90'}
+                      alt={selected.name}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
-                  <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[11px] uppercase tracking-wider text-[#544342] font-semibold">Item Name</label>
-                      <p className="text-base font-medium text-[#1e1b18]">{selected.name}</p>
+
+                  <div className="flex flex-col gap-3 text-xs">
+                    <div>
+                      <span className="eyebrow">Name</span>
+                      <p className="serif text-lg font-bold text-[#1e1b18]">{selected.name}</p>
                     </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-1">
+                      <div className="bg-[#fbf2ed] p-2.5 rounded-lg border border-[#d9c1c0]/40">
+                        <span className="eyebrow text-[10px]">Category</span>
+                        <p className="font-semibold text-[#1e1b18] capitalize mt-0.5">{selected.category}</p>
+                      </div>
+                      <div className="bg-[#fbf2ed] p-2.5 rounded-lg border border-[#d9c1c0]/40">
+                        <span className="eyebrow text-[10px]">Brand</span>
+                        <p className="font-semibold text-[#1e1b18] mt-0.5">{selected.brand || 'Charis'}</p>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[11px] uppercase tracking-wider text-[#544342] font-semibold">Category</label>
-                        <div className="flex justify-between items-center p-2 border border-[#d9c1c0] rounded-lg text-sm">
-                          <span>{selected.category}</span>
-                          <span>▾</span>
-                        </div>
+                      <div className="bg-[#fbf2ed] p-2.5 rounded-lg border border-[#d9c1c0]/40">
+                        <span className="eyebrow text-[10px]">Formality</span>
+                        <p className="font-semibold text-[#1e1b18] mt-0.5">Level {selected.formality_level || 3}/5</p>
                       </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[11px] uppercase tracking-wider text-[#544342] font-semibold">Color</label>
-                        <div className="flex items-center gap-2 p-2 border border-[#d9c1c0] rounded-lg text-sm">
-                          <span className="w-4 h-4 rounded-full border border-black/10" style={{ background: selected.primary_color }} />
-                          <span>{selected.primary_color}</span>
-                        </div>
+                      <div className="bg-[#fbf2ed] p-2.5 rounded-lg border border-[#d9c1c0]/40">
+                        <span className="eyebrow text-[10px]">Times Worn</span>
+                        <p className="font-semibold text-[#380208] mt-0.5">{selected.times_worn || 0} times</p>
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-2.5 mt-2">
-                    <button className="flex-1 py-3 border border-[#d9c1c0] rounded-lg text-sm font-medium hover:border-[#380208] transition-colors">Archive</button>
-                    <button className="flex-1 py-3 bg-[#380208] text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">Save Changes</button>
+
+                  <div className="flex flex-col gap-2.5 pt-2 border-t border-[#d9c1c0]/50">
+                    <button
+                      onClick={() => handleLogWear(selected.id, selected.name)}
+                      className="w-full py-3 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all"
+                    >
+                      + Log Wear Today
+                    </button>
+                    <button
+                      onClick={() => handleDeleteItem(selected.id, selected.name)}
+                      className="w-full py-2.5 border border-red-200 text-red-700 hover:bg-red-50 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <Trash2 size={14} /> Remove Item
+                    </button>
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          <footer className="flex justify-between items-center pt-6 border-t border-[#e1d8d4]">
-            <span className="text-xs text-[#544342]">© 2024 CHARIS EDITORIAL. ALL RIGHTS RESERVED.</span>
-            <nav className="flex gap-4 text-xs text-[#544342]"><a href="#">Privacy</a><a href="#">Terms</a></nav>
+          {/* Add Item Modal */}
+          <AnimatePresence>
+            {showAddModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.95, opacity: 0 }}
+                  className="bg-white rounded-2xl p-6 md:p-8 max-w-lg w-full shadow-2xl border border-[#d9c1c0] flex flex-col gap-6"
+                >
+                  <div className="flex justify-between items-center border-b border-[#d9c1c0]/50 pb-4">
+                    <div>
+                      <span className="eyebrow">Personal Collection</span>
+                      <h2 className="serif text-2xl font-bold text-[#1e1b18]">Curate New Item</h2>
+                    </div>
+                    <button onClick={() => setShowAddModal(false)} className="text-[#867272] hover:text-[#380208]">
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleAddItem} className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-[#544342]">Item Name *</label>
+                      <input
+                        type="text"
+                        value={newItemName}
+                        onChange={e => setNewItemName(e.target.value)}
+                        placeholder="e.g. Italian Double-Breasted Trench"
+                        className="py-2.5 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
+                        required
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-[#544342]">Category</label>
+                        <select
+                          value={newItemCategory}
+                          onChange={e => setNewItemCategory(e.target.value)}
+                          className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208] cursor-pointer"
+                        >
+                          <option value="top">Top</option>
+                          <option value="bottom">Bottom</option>
+                          <option value="outerwear">Outerwear</option>
+                          <option value="shoes">Shoes</option>
+                          <option value="accessory">Accessory</option>
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-[#544342]">Brand</label>
+                        <input
+                          type="text"
+                          value={newItemBrand}
+                          onChange={e => setNewItemBrand(e.target.value)}
+                          placeholder="e.g. Burberry"
+                          className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-[#544342]">Primary Color</label>
+                        <input
+                          type="text"
+                          value={newItemColor}
+                          onChange={e => setNewItemColor(e.target.value)}
+                          placeholder="e.g. Camel or #380208"
+                          className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-[#544342]">Formality Level (1-5)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="5"
+                          value={newItemFormality}
+                          onChange={e => setNewItemFormality(Number(e.target.value))}
+                          className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-[#544342]">Image URL (HD Unsplash / CDN)</label>
+                      <input
+                        type="url"
+                        value={newItemImageUrl}
+                        onChange={e => setNewItemImageUrl(e.target.value)}
+                        placeholder="https://images.unsplash.com/..."
+                        className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="w-full py-3.5 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20 disabled:opacity-50 mt-2"
+                    >
+                      {submitting ? 'Curating...' : 'Curate Item →'}
+                    </button>
+                  </form>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          <footer className="flex justify-between items-center pt-6 border-t border-[#d9c1c0]/50">
+            <span className="text-xs text-[#867272]">© 2026 CHARIS EDITORIAL. ALL RIGHTS RESERVED.</span>
+            <nav className="flex gap-4 text-xs text-[#867272]">
+              <a href="#" className="hover:text-[#380208]">Privacy</a>
+              <a href="#" className="hover:text-[#380208]">Terms</a>
+            </nav>
           </footer>
         </motion.div>
       </AppShell>

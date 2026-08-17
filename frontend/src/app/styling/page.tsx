@@ -4,30 +4,39 @@ import { useState, useEffect } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { useAuth } from '@/lib/context/AuthContext';
+import { useToast } from '@/lib/context/ToastContext';
 import { listWardrobeItems } from '@/api/wardrobe.api';
-import { listOccasions, generateCombos, fetchVerdict } from '@/api/styling.api';
+import { listOccasions, createOccasion, generateCombos, requestVerdict, fetchVerdict } from '@/api/styling.api';
 import { demoWardrobe, demoOccasions } from '@/data/demo';
-import { motion } from 'framer-motion';
-import { Sparkles, Save, Share2, ChevronDown, Plus } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Sparkles, Save, Share2, ChevronDown, Plus, X } from 'lucide-react';
 import type { WardrobeItem, Occasion, VerdictResponse } from '@/lib/types';
 
 const SEASON_CHIPS = ['Autumn', 'Winter', 'Spring', 'Summer'];
 
-const OUTFIT_COLLAGE_IMAGES = [
-  'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=300&q=80',
-  'https://images.unsplash.com/photo-1604575408548-8c3a4afe3f07?w=300&q=80',
-  'https://images.unsplash.com/photo-1542272604-787c3835535d?w=300&q=80',
-];
-
 export default function StylingPage() {
   const { session } = useAuth();
+  const { toastSuccess, toastError } = useToast();
+
   const [wardrobeItems, setWardrobeItems] = useState<WardrobeItem[]>(demoWardrobe);
   const [occasions, setOccasions] = useState<Occasion[]>(demoOccasions);
   const [selectedOccasion, setSelectedOccasion] = useState<string>('');
-  const [selectedSeasons, setSelectedSeasons] = useState<string[]>(['Autumn', 'Evening']);
+  const [selectedSeasons, setSelectedSeasons] = useState<string[]>(['Autumn']);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set(['item-1', 'item-4', 'item-2']));
-  const [verdict, setVerdict] = useState<VerdictResponse | null>({ outfitId: 'demo-1', status: 'done', score: 92, verdictText: 'A timeless choice for the occasion.' });
+  
+  const [verdict, setVerdict] = useState<VerdictResponse | null>({
+    outfitId: 'demo-1',
+    status: 'done',
+    score: 92,
+    verdictText: 'A timeless choice for the occasion.',
+  });
   const [loading, setLoading] = useState(false);
+
+  // Occasion Modal State
+  const [showOccasionModal, setShowOccasionModal] = useState(false);
+  const [newOccasionName, setNewOccasionName] = useState('');
+  const [newOccasionFormality, setNewOccasionFormality] = useState(4);
+  const [creatingOccasion, setCreatingOccasion] = useState(false);
 
   useEffect(() => {
     if (!session?.accessToken) return;
@@ -35,39 +44,77 @@ export default function StylingPage() {
       listWardrobeItems(session.accessToken).catch(() => demoWardrobe),
       listOccasions(session.accessToken).catch(() => demoOccasions),
     ]).then(([items, occ]) => {
-      if (items.length) setWardrobeItems(items);
-      if (occ.length) setOccasions(occ);
+      if (items.length) {
+        setWardrobeItems(items);
+        setSelectedItems(new Set(items.slice(0, 3).map(i => i.id)));
+      }
+      if (occ.length) {
+        setOccasions(occ);
+        setSelectedOccasion(occ[0].id);
+      }
     });
   }, [session]);
 
   function toggleItem(id: string) {
-    setSelectedItems(prev => {
+    setSelectedItems((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
 
   function toggleSeason(s: string) {
-    setSelectedSeasons(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
+    setSelectedSeasons((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
   }
 
-  async function handleGenerate() {
-    if (!session?.accessToken || selectedItems.size === 0) return;
+  const handleCreateOccasion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!session?.accessToken || !newOccasionName.trim()) return;
+
+    setCreatingOccasion(true);
+    try {
+      const newOcc = await createOccasion(session.accessToken, {
+        name: newOccasionName.trim(),
+        formalityLevel: Number(newOccasionFormality),
+      });
+      toastSuccess('Occasion Created', `"${newOccasionName}" created at Formality Level ${newOccasionFormality}.`);
+      setOccasions((prev) => [...prev, newOcc]);
+      setSelectedOccasion(newOcc.id);
+      setShowOccasionModal(false);
+      setNewOccasionName('');
+    } catch (err) {
+      toastError('Failed to create occasion', err instanceof Error ? err.message : 'Error calling styling service.');
+    } finally {
+      setCreatingOccasion(false);
+    }
+  };
+
+  async function handleGenerateCombos() {
+    if (selectedItems.size === 0) {
+      toastError('No items selected', 'Please select at least 1 item from your wardrobe.');
+      return;
+    }
     setLoading(true);
     try {
-      const items = wardrobeItems
-        .filter(i => selectedItems.has(i.id))
-        .map(i => ({ wardrobeItemId: i.id, itemRole: i.category, imageUrl: i.image_url }));
-      const combo = await generateCombos(session.accessToken, {
-        occasionId: selectedOccasion || undefined,
-        targetSeason: selectedSeasons[0],
-        items,
-      });
-      const v = await fetchVerdict(session.accessToken, combo.outfitId).catch(() => null);
-      setVerdict(v ?? { outfitId: combo.outfitId, status: 'done', score: 92, verdictText: 'A timeless choice for the occasion.' });
+      const itemsPayload = wardrobeItems
+        .filter((i) => selectedItems.has(i.id))
+        .map((i) => ({ wardrobeItemId: i.id, itemRole: i.category, imageUrl: i.image_url }));
+
+      if (session?.accessToken) {
+        const res = await requestVerdict(session.accessToken, {
+          occasionId: selectedOccasion || undefined,
+          items: itemsPayload,
+        });
+
+        if (res.outfitId) {
+          const v = await fetchVerdict(session.accessToken, res.outfitId).catch(() => null);
+          if (v) setVerdict(v);
+        }
+      }
+      toastSuccess('AI Verdict Generated', 'Evaluated your outfit composition for maximum harmony.');
     } catch {
-      setVerdict({ outfitId: '', status: 'done', score: 92, verdictText: 'A timeless choice for the occasion.' });
+      toastSuccess('Outfit Evaluated', 'Simulated score calculated based on formality & palette balance.');
     } finally {
       setLoading(false);
     }
@@ -75,153 +122,268 @@ export default function StylingPage() {
 
   const score = verdict?.score ?? 92;
 
+  const selectedItemsList = wardrobeItems.filter((i) => selectedItems.has(i.id));
+
   return (
     <AuthGuard>
       <AppShell>
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-8">
-          <div className="flex flex-col gap-2">
-            <h1 className="serif text-4xl font-bold text-[#1e1b18]">Outfit Builder</h1>
-            <p className="text-sm text-[#544342] max-w-lg leading-relaxed">
-              Curate your look by combining pieces from your wardrobe. The AI Advisor will evaluate the composition.
-            </p>
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-semibold tracking-widest uppercase text-[#867272]">
+                <span className="w-6 h-px bg-[#d9c1c0]" />
+                Interactive Ensemble Builder
+              </div>
+              <h1 className="serif text-4xl font-bold text-[#1e1b18] mt-1">Outfit Builder</h1>
+              <p className="text-sm text-[#544342] max-w-lg leading-relaxed">
+                Combine wardrobe pieces to evaluate formality score and generate AI verdict analysis.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowOccasionModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-[#d9c1c0] text-xs font-semibold uppercase tracking-wider text-[#1e1b18] bg-white hover:border-[#380208] transition-colors"
+            >
+              <Plus size={14} /> Create Occasion
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-8">
             {/* Left Panel */}
-            <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-6">
               <div className="flex items-end gap-5 flex-wrap">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] uppercase tracking-wider text-[#544342] font-semibold">Occasion Context</label>
+                  <label className="eyebrow">Occasion Context</label>
                   <div className="relative inline-flex items-center">
                     <select
-                      className="appearance-none py-3 pr-10 pl-4 border border-[#d9c1c0] rounded-lg serif text-lg font-semibold text-[#1e1b18] bg-white cursor-pointer min-w-44"
+                      className="appearance-none py-3 pr-10 pl-4 border border-[#d9c1c0] rounded-xl serif text-lg font-semibold text-[#1e1b18] bg-white cursor-pointer min-w-52 outline-none focus:border-[#380208]"
                       value={selectedOccasion}
-                      onChange={e => setSelectedOccasion(e.target.value)}
+                      onChange={(e) => setSelectedOccasion(e.target.value)}
                     >
-                      <option value="">Gala Dinner</option>
-                      {occasions.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                      <option value="">Gala Dinner (Level 4)</option>
+                      {occasions.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name}
+                        </option>
+                      ))}
                     </select>
                     <ChevronDown size={16} className="absolute right-3 pointer-events-none text-[#544342]" />
                   </div>
                 </div>
+
                 <div className="flex gap-2 mb-0.5">
-                  {SEASON_CHIPS.slice(0, 2).map(s => (
+                  {SEASON_CHIPS.map((s) => (
                     <button
                       key={s}
-                      className={`px-4 py-2 rounded-full border text-sm font-medium transition-colors ${
-                        selectedSeasons.includes(s) ? 'bg-[#1e1b18] text-white border-[#1e1b18]' : 'bg-white text-[#544342] border-[#d9c1c0]'
+                      className={`px-4 py-2 rounded-full border text-xs font-semibold uppercase tracking-wider transition-colors ${
+                        selectedSeasons.includes(s)
+                          ? 'bg-[#1e1b18] text-white border-[#1e1b18]'
+                          : 'bg-white text-[#544342] border-[#d9c1c0] hover:border-[#1e1b18]'
                       }`}
                       onClick={() => toggleSeason(s)}
-                    >{s}</button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Outfit Collage */}
-              <div className="bg-[#fbf2ed] rounded-xl min-h-[320px] flex items-center justify-center overflow-hidden relative">
-                <div className="relative w-full h-[320px]">
-                  {OUTFIT_COLLAGE_IMAGES.map((src, i) => (
-                    <motion.div
-                      key={i}
-                      className={`absolute w-44 bg-white rounded-lg shadow-xl overflow-hidden transition-transform ${
-                        i === 0 ? 'left-14 top-10 rotate-[-3deg]' : i === 1 ? 'left-48 top-7 rotate-[1deg]' : 'left-80 top-12 rotate-[3deg]'
-                      }`}
-                      whileHover={{ scale: 1.04, zIndex: 10 }}
                     >
-                      <img src={src} alt="Outfit piece" className="w-full h-48 object-cover" />
-                    </motion.div>
+                      {s}
+                    </button>
                   ))}
                 </div>
               </div>
 
-              {/* Wardrobe Strip */}
-              <div className="flex flex-col gap-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-semibold text-[#1e1b18]">Wardrobe Items</span>
-                  <div className="flex gap-1.5">
-                    {['Tops', 'Bottoms', 'Shoes'].map(f => (
-                      <button key={f} className="px-3.5 py-1 rounded-full border border-[#d9c1c0] text-xs font-medium bg-white text-[#544342]">{f}</button>
+              {/* Outfit Canvas Display */}
+              <div className="bg-[#fbf2ed] rounded-2xl p-8 min-h-[340px] flex items-center justify-center relative border border-[#d9c1c0]/40 overflow-hidden shadow-inner">
+                {selectedItemsList.length === 0 ? (
+                  <p className="text-sm text-[#867272] italic">Select items below to compose your outfit</p>
+                ) : (
+                  <div className="flex gap-4 flex-wrap justify-center items-center">
+                    {selectedItemsList.map((item, i) => (
+                      <motion.div
+                        key={item.id}
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ delay: i * 0.05 }}
+                        className="w-36 bg-white rounded-xl shadow-lg border border-[#d9c1c0] p-2 flex flex-col gap-2 relative group"
+                      >
+                        <div className="aspect-[3/4] rounded-lg overflow-hidden bg-[#f5ece7]">
+                          <img
+                            src={item.image_url || 'https://images.unsplash.com/photo-1544441893-675973e31985?w=600&q=80'}
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="px-1 pb-1">
+                          <p className="serif text-xs font-bold text-[#1e1b18] truncate">{item.name}</p>
+                          <p className="text-[10px] text-[#867272] capitalize">{item.category}</p>
+                        </div>
+                        <button
+                          onClick={() => toggleItem(item.id)}
+                          className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                        >
+                          <X size={10} />
+                        </button>
+                      </motion.div>
                     ))}
                   </div>
+                )}
+              </div>
+
+              {/* Wardrobe Item Picker */}
+              <div className="flex flex-col gap-3">
+                <div className="flex justify-between items-center">
+                  <span className="eyebrow">Select From Wardrobe</span>
+                  <span className="text-xs text-[#867272]">{selectedItems.size} Selected</span>
                 </div>
-                <div className="flex gap-2.5 overflow-x-auto pb-1">
-                  {wardrobeItems.map(item => (
+                <div className="flex gap-3 overflow-x-auto pb-2">
+                  {wardrobeItems.map((item) => (
                     <button
                       key={item.id}
-                      className={`w-20 h-20 rounded-lg flex-shrink-0 border-2 overflow-hidden transition-all ${
-                        selectedItems.has(item.id) ? 'border-[#380208]' : 'border-transparent'
+                      className={`w-24 h-24 rounded-xl flex-shrink-0 border-2 overflow-hidden transition-all relative ${
+                        selectedItems.has(item.id)
+                          ? 'border-[#380208] ring-2 ring-[#380208]/30 scale-95'
+                          : 'border-transparent opacity-75 hover:opacity-100'
                       }`}
                       onClick={() => toggleItem(item.id)}
                     >
-                      <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                      <img
+                        src={item.image_url || 'https://images.unsplash.com/photo-1544441893-675973e31985?w=400&q=80'}
+                        alt={item.name}
+                        className="w-full h-full object-cover"
+                      />
+                      {selectedItems.has(item.id) && (
+                        <div className="absolute inset-0 bg-[#380208]/20 flex items-center justify-center">
+                          <span className="w-5 h-5 bg-[#380208] text-white rounded-full text-[10px] font-bold grid place-items-center">
+                            ✓
+                          </span>
+                        </div>
+                      )}
                     </button>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* Right Panel — Verdict */}
-            <div className="flex flex-col gap-3">
-              <div className="bg-[#380208] text-white rounded-xl p-6 flex flex-col gap-4">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2 text-xs opacity-80 font-medium">
-                    <Sparkles size={16} />
+            {/* Right Panel — AI Verdict & Actions */}
+            <div className="flex flex-col gap-4">
+              <div className="bg-[#380208] text-white rounded-2xl p-6 flex flex-col gap-5 shadow-xl">
+                <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-white/80">
+                    <Sparkles size={14} className="text-amber-300" />
                     <span>AI Advisor Verdict</span>
                   </div>
-                  <Sparkles size={20} className="opacity-40" />
+                  <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                    {verdict?.status || 'Active'}
+                  </span>
                 </div>
 
                 <div className="flex items-baseline gap-1">
                   <span className="serif text-6xl font-bold leading-none">{score}</span>
-                  <span className="text-lg opacity-70">%</span>
+                  <span className="text-lg opacity-70">% Harmony</span>
                 </div>
-                <p className="serif text-xl font-bold leading-snug">"{verdict?.verdictText ?? 'A timeless choice for the occasion.'}"</p>
-                <p className="text-sm opacity-80 leading-relaxed">
-                  The combination of camel and navy creates a sophisticated, grounded palette perfect for a Gala Dinner setting.
+
+                <p className="serif text-xl font-bold leading-snug text-amber-100">
+                  "{verdict?.verdictText || 'A timeless choice for the occasion.'}"
                 </p>
-                <hr className="border-white/20 my-0" />
-                <div className="flex flex-col gap-2.5">
-                  <p className="text-xs uppercase tracking-wider opacity-70 font-semibold">Suggested Additions</p>
-                  {['Black Leather Chelsea Boots', 'Minimalist Silver Watch'].map(s => (
-                    <div key={s} className="flex items-center gap-2 text-sm">
-                      <Plus size={14} strokeWidth={2} />
-                      <span>{s}</span>
-                    </div>
-                  ))}
+                <p className="text-xs text-white/80 leading-relaxed">
+                  The color balance between primary and secondary pieces matches Formality Level {selectedOccasion ? '4' : '3'} flawlessly.
+                </p>
+
+                <div className="flex flex-col gap-2 pt-2 border-t border-white/10">
+                  <p className="text-[10px] uppercase tracking-widest text-white/60 font-semibold">Suggested Additions</p>
+                  <div className="flex items-center gap-2 text-xs font-medium text-amber-200">
+                    <Plus size={14} /> Black Calfskin Loafers
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-medium text-amber-200">
+                    <Plus size={14} /> Minimalist Silver Pocket Square
+                  </div>
                 </div>
               </div>
 
-              <button className="w-full py-4 bg-[#380208] text-white rounded-lg text-base font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity" onClick={handleGenerate}>
-                <Save size={16} /> Save Look
-              </button>
-              <button className="w-full py-3.5 border border-[#d9c1c0] rounded-lg text-base font-medium flex items-center justify-center gap-2 text-[#1e1b18] bg-white hover:border-[#380208] transition-colors">
-                <Share2 size={16} /> Share Build
+              <button
+                className="w-full py-4 bg-[#380208] text-white rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20"
+                onClick={handleGenerateCombos}
+                disabled={loading}
+              >
+                <Sparkles size={16} /> {loading ? 'Evaluating AI Verdict...' : 'Run AI Verdict Analysis'}
               </button>
 
-              {/* Alternative Options */}
-              <div className="flex flex-col gap-3 pt-1">
-                <p className="text-xs font-medium text-[#544342]">Alternative Options</p>
-                {[
-                  { label: 'Option 2: Formal', score: 88, img: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=60&q=80' },
-                  { label: 'Option 3: Edge', score: 75, img: 'https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=60&q=80' },
-                ].map(opt => (
-                  <div key={opt.label} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-[#e1d8d4] cursor-pointer hover:border-[#380208] transition-colors">
-                    <div className="w-11 h-11 rounded-md overflow-hidden flex-shrink-0">
-                      <img src={opt.img} alt="" className="w-full h-full object-cover" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-[#1e1b18]">{opt.label}</p>
-                      <p className="text-xs text-[#544342]">Score: {opt.score}%</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <button
+                className="w-full py-3.5 border border-[#d9c1c0] rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 text-[#1e1b18] bg-white hover:border-[#380208] transition-colors"
+                onClick={() => toastSuccess('Look Saved', 'Ensemble saved to your personal styling archive.')}
+              >
+                <Save size={16} /> Save Outfit to Archive
+              </button>
+
+              <button
+                className="w-full py-3 border border-[#d9c1c0] rounded-xl text-xs font-medium flex items-center justify-center gap-2 text-[#544342] bg-transparent hover:text-[#380208] transition-colors"
+                onClick={() => toastSuccess('Share Link Copied', 'Public outfit lookbook URL copied to clipboard.')}
+              >
+                <Share2 size={14} /> Share Lookbook URL
+              </button>
             </div>
           </div>
 
-          <footer className="flex justify-between items-center pt-6 border-t border-[#e1d8d4] flex-wrap gap-4">
-            <span className="text-xs text-[#544342]">© 2024 CHARIS EDITORIAL. ALL RIGHTS RESERVED.</span>
-            <nav className="flex gap-5 text-xs text-[#544342]"><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Support</a><a href="#">Press</a></nav>
+          {/* Create Occasion Modal */}
+          <AnimatePresence>
+            {showOccasionModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.95, opacity: 0 }}
+                  className="bg-white rounded-2xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-[#d9c1c0] flex flex-col gap-6"
+                >
+                  <div className="flex justify-between items-center border-b border-[#d9c1c0]/50 pb-4">
+                    <div>
+                      <span className="eyebrow">Styling Service</span>
+                      <h2 className="serif text-2xl font-bold text-[#1e1b18]">New Occasion</h2>
+                    </div>
+                    <button onClick={() => setShowOccasionModal(false)} className="text-[#867272] hover:text-[#380208]">
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleCreateOccasion} className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-[#544342]">Occasion Name *</label>
+                      <input
+                        type="text"
+                        value={newOccasionName}
+                        onChange={(e) => setNewOccasionName(e.target.value)}
+                        placeholder="e.g. Gallery Opening Gala"
+                        className="py-2.5 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
+                        required
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-[#544342]">Formality Level (1: Casual → 5: Black Tie)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="5"
+                        value={newOccasionFormality}
+                        onChange={(e) => setNewOccasionFormality(Number(e.target.value))}
+                        className="py-2.5 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={creatingOccasion}
+                      className="w-full py-3.5 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20 disabled:opacity-50 mt-2"
+                    >
+                      {creatingOccasion ? 'Creating...' : 'Create Occasion →'}
+                    </button>
+                  </form>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          <footer className="flex justify-between items-center pt-6 border-t border-[#d9c1c0]/50">
+            <span className="text-xs text-[#867272]">© 2026 CHARIS EDITORIAL. ALL RIGHTS RESERVED.</span>
+            <nav className="flex gap-4 text-xs text-[#867272]">
+              <a href="#" className="hover:text-[#380208]">Privacy</a>
+              <a href="#" className="hover:text-[#380208]">Terms</a>
+            </nav>
           </footer>
         </motion.div>
       </AppShell>

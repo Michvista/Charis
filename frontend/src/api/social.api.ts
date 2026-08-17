@@ -2,10 +2,11 @@ import { requestBackend } from './client';
 import type { Friendship, OutfitShare } from '../lib/types';
 
 export async function listSocialFeed(token: string): Promise<OutfitShare[]> {
-  return requestBackend<OutfitShare[]>('/social/feed/', {
+  const res = await requestBackend<any>('/social/feed/', {
     method: 'GET',
     token,
   });
+  return Array.isArray(res) ? res : (res?.results ?? []);
 }
 
 export async function createOutfitShare(token: string, data: { outfit_id: string; caption: string; visibility?: 'public' | 'friends' | 'link_only' }): Promise<OutfitShare> {
@@ -50,8 +51,9 @@ export async function createFriendship(token: string, friendUserId: string): Pro
 }
 
 export async function listFriendships(token: string): Promise<Friendship[]> {
-  return requestBackend<Friendship[]>('/social/friendships/', {
+  const res = await requestBackend<any>('/social/friendships/', {
     method: 'GET',
     token,
   });
+  return Array.isArray(res) ? res : (res?.results ?? []);
 }

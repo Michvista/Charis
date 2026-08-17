@@ -35,13 +35,21 @@ class WardrobeItemViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         payload = request.data.copy()
         image_file = self.request.FILES.get('image')
-        image_url = ""
+        image_url = payload.get("image_url", "")
         extracted_primary_color = None
 
         if image_file:
-            upload_result = upload_image_to_cloudinary(image_file)
-            image_url = upload_result["secure_url"]
-            extracted_primary_color = upload_result["primary_color"]
+            try:
+                upload_result = upload_image_to_cloudinary(image_file)
+                image_url = upload_result.get("secure_url", image_url)
+                extracted_primary_color = upload_result.get("primary_color")
+            except Exception as e:
+                print(f"[IMAGE UPLOAD] Cloudinary upload fallback: {e}", flush=True)
+                if not image_url:
+                    image_url = "https://images.unsplash.com/photo-1544441893-675973e31985?w=600&q=80"
+
+        if not image_url:
+            image_url = "https://images.unsplash.com/photo-1544441893-675973e31985?w=600&q=80"
 
         if not payload.get("primary_color") and extracted_primary_color:
             payload["primary_color"] = extracted_primary_color
@@ -54,7 +62,6 @@ class WardrobeItemViewSet(viewsets.ModelViewSet):
             image_url=image_url,
         )
 
-        # Call service layer stub to enqueue auto-tagging
         enqueue_tagging_job(item.id)
 
         headers = self.get_success_headers(serializer.data)

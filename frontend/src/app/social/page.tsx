@@ -29,7 +29,7 @@ export default function SocialPage() {
   const { toastSuccess, toastError } = useToast();
 
   const [activeTab, setActiveTab] = useState<'feed' | 'profile'>('feed');
-  const [shares, setShares] = useState<OutfitShare[]>(demoShares);
+  const [shares, setShares] = useState<OutfitShare[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   
   // Compose Post State
@@ -45,15 +45,13 @@ export default function SocialPage() {
     if (!session?.accessToken) return;
     try {
       const [feedData, userProf] = await Promise.all([
-        listSocialFeed(session.accessToken).catch(() => demoShares),
+        listSocialFeed(session.accessToken).catch(() => []),
         fetchProfile(session.accessToken).catch(() => session.user),
       ]);
-      if (Array.isArray(feedData) && feedData.length > 0) {
-        setShares(feedData);
-      }
+      setShares(feedData);
       if (userProf) setProfile(userProf);
     } catch {
-      // Fallback to demo
+      // Fallback
     }
   };
 

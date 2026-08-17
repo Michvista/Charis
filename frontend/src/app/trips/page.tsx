@@ -15,8 +15,8 @@ export default function TripsPage() {
   const { session } = useAuth();
   const { toastSuccess, toastError } = useToast();
 
-  const [trips, setTrips] = useState<Trip[]>(demoTrips);
-  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(demoTrips[0]);
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [generating, setGenerating] = useState(false);
 
   // Modal States
@@ -43,14 +43,12 @@ export default function TripsPage() {
     if (!session?.accessToken) return;
     listTrips(session.accessToken)
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setTrips(data);
+        setTrips(data);
+        if (data.length > 0) {
           setSelectedTrip(data[0]);
         }
       })
-      .catch(() => {
-        setSelectedTrip(demoTrips[0]);
-      });
+      .catch(() => {});
   }, [session]);
 
   const handleCreateTrip = async (e: React.FormEvent) => {

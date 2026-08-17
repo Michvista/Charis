@@ -21,7 +21,7 @@ export default function AdvisorPage() {
   const { session } = useAuth();
   const { toastSuccess, toastError } = useToast();
 
-  const [suggestions, setSuggestions] = useState<StyleAdvisorSuggestion[]>(demoSuggestions);
+  const [suggestions, setSuggestions] = useState<StyleAdvisorSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [occasion, setOccasion] = useState('Formal dinner with gallery opening styling constraints');
 

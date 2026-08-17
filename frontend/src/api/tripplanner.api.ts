@@ -2,10 +2,11 @@ import { requestBackend } from './client';
 import type { PackingList, Trip, TripEvent } from '../lib/types';
 
 export async function listTrips(token: string): Promise<Trip[]> {
-  return requestBackend<Trip[]>('/tripplanner/trips/', {
+  const res = await requestBackend<any>('/tripplanner/trips/', {
     method: 'GET',
     token,
   });
+  return Array.isArray(res) ? res : (res?.results ?? []);
 }
 
 export async function createTrip(token: string, data: { name: string; destination: string; start_date: string; end_date: string; description?: string }): Promise<Trip> {

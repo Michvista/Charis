@@ -19,22 +19,17 @@ export default function StylingPage() {
   const { session } = useAuth();
   const { toastSuccess, toastError } = useToast();
 
-  const [wardrobeItems, setWardrobeItems] = useState<WardrobeItem[]>(demoWardrobe);
-  const [occasions, setOccasions] = useState<Occasion[]>(demoOccasions);
+  const [wardrobeItems, setWardrobeItems] = useState<WardrobeItem[]>([]);
+  const [occasions, setOccasions] = useState<Occasion[]>([]);
   const [selectedOccasion, setSelectedOccasion] = useState<string>('');
   const [selectedSeasons, setSelectedSeasons] = useState<string[]>(['Autumn']);
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set(['item-1', 'item-4', 'item-2']));
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   
   // Decluttering Filters for 50+ Wardrobe Items
   const [itemSearch, setItemSearch] = useState('');
   const [itemCategoryFilter, setItemCategoryFilter] = useState('All');
 
-  const [verdict, setVerdict] = useState<VerdictResponse | null>({
-    outfitId: 'demo-1',
-    status: 'done',
-    score: 92,
-    verdictText: 'A timeless choice for the occasion.',
-  });
+  const [verdict, setVerdict] = useState<VerdictResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Occasion Modal State
@@ -46,15 +41,15 @@ export default function StylingPage() {
   useEffect(() => {
     if (!session?.accessToken) return;
     Promise.all([
-      listWardrobeItems(session.accessToken).catch(() => demoWardrobe),
-      listOccasions(session.accessToken).catch(() => demoOccasions),
+      listWardrobeItems(session.accessToken).catch(() => []),
+      listOccasions(session.accessToken).catch(() => []),
     ]).then(([items, occ]) => {
+      setWardrobeItems(items);
+      setOccasions(occ);
       if (items.length) {
-        setWardrobeItems(items);
         setSelectedItems(new Set(items.slice(0, 3).map((i) => i.id)));
       }
       if (occ.length) {
-        setOccasions(occ);
         setSelectedOccasion(occ[0].id);
       }
     });

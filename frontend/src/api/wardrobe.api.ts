@@ -2,10 +2,11 @@ import { requestBackend } from './client';
 import type { WardrobeItem, WearLog } from '../lib/types';
 
 export async function listWardrobeItems(token: string): Promise<WardrobeItem[]> {
-  return requestBackend<WardrobeItem[]>('/wardrobe/items/', {
+  const res = await requestBackend<any>('/wardrobe/items/', {
     method: 'GET',
     token,
   });
+  return Array.isArray(res) ? res : (res?.results ?? []);
 }
 
 export async function createWardrobeItem(token: string, formData: FormData): Promise<WardrobeItem> {
@@ -47,8 +48,9 @@ export async function logWear(token: string, itemId: string, outfitId?: string):
 }
 
 export async function listWearLogs(token: string): Promise<WearLog[]> {
-  return requestBackend<WearLog[]>('/wardrobe/wear-logs/', {
+  const res = await requestBackend<any>('/wardrobe/wear-logs/', {
     method: 'GET',
     token,
   });
+  return Array.isArray(res) ? res : (res?.results ?? []);
 }

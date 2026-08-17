@@ -24,7 +24,6 @@ services:
     build:
       context: ./styling-service
       dockerfile: Dockerfile
-    container_name: charis_styling
     command: sh -c "npm ci && npm run dev:start"
     volumes:
       - ./styling-service:/app

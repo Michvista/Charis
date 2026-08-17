@@ -17,11 +17,11 @@ type RegisterResponsePayload = {
   refresh?: string;
 };
 
-export async function login(usernameOrEmail: string, password: string): Promise<AuthSession> {
+export async function login(email: string, password: string): Promise<AuthSession> {
   const payload = await requestBackend<LoginResponsePayload>('/auth/login/', {
     method: 'POST',
     body: {
-      username: usernameOrEmail,
+      email,
       password,
     },
   });
@@ -36,14 +36,21 @@ export async function login(usernameOrEmail: string, password: string): Promise<
   return session;
 }
 
-export async function register(email: string, password: string, username?: string): Promise<AuthSession> {
+export async function register(
+  email: string,
+  password: string,
+  passwordConfirm: string,
+  username?: string
+): Promise<AuthSession> {
+  const finalUsername = username && username.trim() !== '' ? username.trim() : email.split('@')[0];
+
   const payload = await requestBackend<RegisterResponsePayload>('/auth/register/', {
     method: 'POST',
     body: {
-      email,
-      username: username || email.split('@')[0],
+      email: email.trim(),
+      username: finalUsername,
       password,
-      password_confirm: password,
+      password_confirm: passwordConfirm,
     },
   });
 

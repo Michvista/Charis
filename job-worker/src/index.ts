@@ -1,4 +1,10 @@
 import "dotenv/config";
+import dns from "node:dns";
+
+try {
+  dns.setDefaultResultOrder("ipv4first");
+} catch {}
+
 import { Worker } from "bullmq";
 import { startTaggingWorker } from "./processors/tagging.processor";
 import { startComboWorker } from "./processors/combo.processor";

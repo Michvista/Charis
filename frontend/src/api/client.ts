@@ -61,6 +61,13 @@ async function parseResponse<T>(response: Response): Promise<T> {
     } else if (typeof payload === 'string' && payload) {
       message = payload;
     }
+    if (response.status === 401 && typeof window !== 'undefined') {
+      clearSession();
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
+    }
+
     throw new ApiError(message, response.status, payload);
   }
 

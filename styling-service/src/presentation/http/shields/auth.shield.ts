@@ -41,16 +41,10 @@ export const authShield = (req: DRequest, res: DResponse, next: DNextFunc) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
-    const userId =
-      typeof decoded.user_id === "string"
-        ? decoded.user_id
-        : typeof decoded.sub === "string"
-          ? decoded.sub
-          : typeof decoded.id === "string"
-            ? decoded.id
-            : undefined;
+    const rawUserId = decoded.user_id ?? decoded.sub ?? decoded.id;
+    const userId = rawUserId !== undefined ? String(rawUserId) : undefined;
 
-    if (!userId || typeof userId !== "string") {
+    if (!userId) {
       return res.status(401).json({
         status: "fail",
         message: "Unauthorized: Token is missing a user id",

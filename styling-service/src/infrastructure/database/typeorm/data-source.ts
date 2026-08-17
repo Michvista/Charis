@@ -6,10 +6,11 @@ import { OccasionOrmEntity } from "./entities/occasion.orm-entity";
 import { OutfitOrmEntity } from "./entities/outfit.orm-entity";
 import { OutfitItemOrmEntity } from "./entities/outfit-item.orm-entity";
 
+const databaseUrl = process.env.DATABASE_URL;
+const useSsl = !!databaseUrl && (databaseUrl.includes("neon.tech") || process.env.NODE_ENV === "production");
+
 export async function ensureStylingSchema(): Promise<void> {
   const schemaName = process.env.DATABASE_SCHEMA || "styling_service";
-  const databaseUrl = process.env.DATABASE_URL;
-
   if (!databaseUrl || !schemaName) {
     return;
   }
@@ -18,6 +19,7 @@ export async function ensureStylingSchema(): Promise<void> {
     Client: new (options: {
       connectionString: string;
       ssl?: { rejectUnauthorized: boolean } | false;
+      connectionTimeoutMillis?: number;
     }) => {
       connect(): Promise<void>;
       query(sql: string): Promise<unknown>;
@@ -27,11 +29,8 @@ export async function ensureStylingSchema(): Promise<void> {
 
   const client = new Client({
     connectionString: databaseUrl,
-    ssl:
-      process.env.NODE_ENV === "production" ||
-      databaseUrl.includes("neon.tech")
-        ? { rejectUnauthorized: false }
-        : undefined,
+    ssl: useSsl ? { rejectUnauthorized: false } : false,
+    connectionTimeoutMillis: 10000,
   });
 
   await client.connect();
@@ -44,13 +43,12 @@ export async function ensureStylingSchema(): Promise<void> {
 
 export const AppDataSource = new DataSource({
   type: "postgres",
-  url: process.env.DATABASE_URL,
+  url: databaseUrl,
   schema: process.env.DATABASE_SCHEMA || "styling_service",
-  ssl:
-    process.env.NODE_ENV === "production" ||
-    process.env.DATABASE_URL?.includes("neon.tech")
-      ? { rejectUnauthorized: false }
-      : false,
+  ssl: useSsl ? { rejectUnauthorized: false } : false,
+  extra: {
+    connectionTimeoutMillis: 10000,
+  },
   synchronize: true,
   logging: process.env.NODE_ENV === "development",
   entities: [OccasionOrmEntity, OutfitOrmEntity, OutfitItemOrmEntity],

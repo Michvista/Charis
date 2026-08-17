@@ -103,7 +103,7 @@ export default function StylingPage() {
       if (session?.accessToken) {
         // Step 1: Submit verdict request -> returns { outfitId, status: "pending" }
         const res = await requestVerdict(session.accessToken, {
-          occasionId: selectedOccasion || undefined,
+          occasionId: selectedOccasion || occasions[0]?.id || undefined,
           items: itemsPayload,
         });
 

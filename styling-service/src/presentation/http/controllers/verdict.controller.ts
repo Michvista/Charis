@@ -58,9 +58,16 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
       userId,
     };
 
-    const result = await this.evaluateUseCase.execute(dto);
-
-    SuccessResponse({ res, body: result, status: 202 });
+    try {
+      const result = await this.evaluateUseCase.execute(dto);
+      SuccessResponse({ res, body: result, status: 202 });
+    } catch (err: any) {
+      console.error("evaluateOutfit error:", err);
+      return res.status(400).json({
+        status: "fail",
+        message: err.message || "Failed to evaluate outfit verdict",
+      });
+    }
   }
 
   @Patch(":id/complete")

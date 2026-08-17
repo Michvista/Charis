@@ -23,13 +23,14 @@ export class EvaluateVerdictUseCase implements IUseCase<
   ) {}
 
   async execute(request: EvaluateVerdictDTO): Promise<VerdictResponseDTO> {
-    if (!request.occasionId) {
-      throw new Error("occasionId is required to evaluate an outfit.");
-    }
-
-    const occasion = await this.occasionRepo.findById(request.occasionId);
+    let occasion = request.occasionId ? await this.occasionRepo.findById(request.occasionId) : null;
     if (!occasion) {
-      throw new Error("Occasion not found.");
+      const allOccasions = await this.occasionRepo.findAll();
+      occasion = allOccasions[0] || {
+        id: request.occasionId || "default-occasion",
+        name: "General / Formal Styling",
+        formalityLevel: 4,
+      };
     }
 
     const outfitItems = request.items.map((i) =>

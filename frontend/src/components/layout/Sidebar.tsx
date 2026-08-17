@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
-import { Shirt, Luggage, Users, BarChart2, Sparkles, BookMarked, Home, Plus } from 'lucide-react';
+import { Shirt, Luggage, Users, BarChart2, Sparkles, BookMarked, Home, Settings } from 'lucide-react';
 import { useAuth } from '@/lib/context/AuthContext';
 
 const NAV_ITEMS = [
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { id: 'social', icon: Users, label: 'Lookbook', path: '/social' },
   { id: 'analytics', icon: BarChart2, label: 'Analytics', path: '/analytics' },
   { id: 'advisor', icon: Sparkles, label: 'Advisor', path: '/advisor' },
+  { id: 'settings', icon: Settings, label: 'Settings', path: '/settings' },
 ];
 
 export function Sidebar() {
@@ -30,13 +31,15 @@ export function Sidebar() {
           C.
         </div>
 
-        {session?.user?.avatar_url ? (
-          <img src={session.user.avatar_url} alt="avatar" className="w-10 h-10 rounded-xl object-cover" />
-        ) : (
-          <div className="w-10 h-10 rounded-xl bg-[#380208]/10 text-[#380208] font-bold text-base grid place-items-center">
-            {session?.user?.username?.[0]?.toUpperCase() ?? 'C'}
-          </div>
-        )}
+        <button onClick={() => router.push('/settings')} title="Account Settings">
+          {session?.user?.avatar_url ? (
+            <img src={session.user.avatar_url} alt="avatar" className="w-10 h-10 rounded-xl object-cover hover:ring-2 hover:ring-[#380208] transition-all" />
+          ) : (
+            <div className="w-10 h-10 rounded-xl bg-[#380208]/10 text-[#380208] font-bold text-base grid place-items-center hover:bg-[#380208]/20 transition-all">
+              {session?.user?.username?.[0]?.toUpperCase() ?? 'C'}
+            </div>
+          )}
+        </button>
 
         <nav className="flex flex-col gap-1 flex-1 mt-2 w-full px-2">
           {NAV_ITEMS.map(({ id, icon: Icon, label, path }) => {
@@ -44,7 +47,7 @@ export function Sidebar() {
             return (
               <button
                 key={id}
-                className={`w-full h-12 rounded-xl grid place-items-center transition-all duration-200 ${
+                className={`w-full h-11 rounded-xl grid place-items-center transition-all duration-200 ${
                   isActive
                     ? 'bg-[#380208]/10 text-[#380208] shadow-[inset_3px_0_0_#380208]'
                     : 'text-[#544342] hover:bg-[#380208]/5 hover:text-[#380208] hover:-translate-y-0.5'
@@ -52,7 +55,7 @@ export function Sidebar() {
                 onClick={() => router.push(path)}
                 title={label}
               >
-                <Icon size={22} strokeWidth={1.5} />
+                <Icon size={20} strokeWidth={1.5} />
               </button>
             );
           })}
@@ -81,7 +84,7 @@ export function Sidebar() {
               }`}
               onClick={() => router.push(path)}
             >
-              <Icon size={20} strokeWidth={isActive ? 2 : 1.5} />
+              <Icon size={18} strokeWidth={isActive ? 2 : 1.5} />
               <span className="mt-0.5">{label}</span>
             </button>
           );

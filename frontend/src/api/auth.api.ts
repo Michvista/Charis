@@ -68,18 +68,28 @@ export async function register(
 }
 
 export async function logout(accessToken: string, refreshToken: string): Promise<void> {
-  await requestBackend('/auth/logout/', {
-    method: 'POST',
-    token: accessToken,
-    body: {
-      refresh: refreshToken,
-    },
-  });
+  try {
+    await requestBackend('/auth/logout/', {
+      method: 'POST',
+      token: accessToken,
+      body: {
+        refresh: refreshToken,
+      },
+    });
+  } catch {}
 }
 
 export async function fetchProfile(token: string): Promise<UserProfile> {
   return requestBackend<UserProfile>('/auth/profile/', {
     method: 'GET',
     token,
+  });
+}
+
+export async function updateProfile(token: string, data: Partial<UserProfile>): Promise<UserProfile> {
+  return requestBackend<UserProfile>('/auth/profile/', {
+    method: 'PATCH',
+    token,
+    body: data as Record<string, unknown>,
   });
 }

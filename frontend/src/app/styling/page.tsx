@@ -7,7 +7,6 @@ import { useAuth } from '@/lib/context/AuthContext';
 import { useToast } from '@/lib/context/ToastContext';
 import { listWardrobeItems } from '@/api/wardrobe.api';
 import { listOccasions, createOccasion, generateCombos, requestVerdict, fetchVerdict } from '@/api/styling.api';
-import { demoWardrobe, demoOccasions } from '@/data/demo';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Save, Share2, ChevronDown, Plus, X, Search, Filter } from 'lucide-react';
 import type { WardrobeItem, Occasion, VerdictResponse } from '@/lib/types';
@@ -108,7 +107,7 @@ export default function StylingPage() {
           items: itemsPayload,
         });
 
-        const outfitId = res.outfitId;
+        const outfitId = res?.outfitId;
         if (outfitId) {
           setVerdict({
             outfitId,
@@ -137,12 +136,12 @@ export default function StylingPage() {
                 } else if (normalizedVerdict.status === 'failed') {
                   setVerdict({
                     outfitId,
-                    status: 'done',
-                    score: 88,
-                    verdictText: 'Evaluated formality and palette balance for selected occasion.',
+                    status: 'failed',
+                    score: 0,
+                    verdictText: 'AI Verdict processing encountered a worker error.',
                   });
                   completed = true;
-                  toastSuccess('Verdict Evaluated', 'Calculated ensemble score.');
+                  toastError('Verdict Worker Error', 'Styling service failed to process Gemini vision verdict.');
                   break;
                 }
               }
@@ -152,38 +151,25 @@ export default function StylingPage() {
           }
 
           if (!completed) {
-            setVerdict({
-              outfitId,
-              status: 'done',
-              score: 92,
-              verdictText: 'A timeless choice for the occasion.',
-            });
-            toastSuccess('Verdict Completed', 'Calculated ensemble score.');
+            setVerdict(null);
+            toastError('Verdict Timeout', 'Styling worker took too long to complete.');
           }
+        } else {
+          setVerdict(null);
+          toastError('Verdict Failed', 'No outfitId returned from styling service.');
         }
       } else {
-        setVerdict({
-          outfitId: 'demo-1',
-          status: 'done',
-          score: 92,
-          verdictText: 'A timeless choice for the occasion.',
-        });
-        toastSuccess('Outfit Evaluated', 'Simulated score calculated based on formality & palette balance.');
+        toastError('Authentication Required', 'Please sign in to run AI verdict analysis.');
       }
-    } catch {
-      setVerdict({
-        outfitId: 'demo-1',
-        status: 'done',
-        score: 92,
-        verdictText: 'A timeless choice for the occasion.',
-      });
-      toastSuccess('Outfit Evaluated', 'Simulated score calculated based on formality & palette balance.');
+    } catch (err) {
+      setVerdict(null);
+      toastError('AI Verdict Failed', err instanceof Error ? err.message : 'Server returned 500 Internal Error.');
     } finally {
       setLoading(false);
     }
   }
 
-  const score = verdict?.score ?? 92;
+  const score = verdict?.score ?? 0;
   const selectedItemsList = wardrobeItems.filter((i) => selectedItems.has(i.id));
 
   // Decluttered Wardrobe List (Search + Category Filtered)
@@ -235,9 +221,9 @@ export default function StylingPage() {
                       value={selectedOccasion}
                       onChange={(e) => setSelectedOccasion(e.target.value)}
                     >
-                      <option value="">Gala Dinner (Level 4)</option>
-                      {occasions.map((o) => (
-                        <option key={o.id} value={o.id}>
+                      <option value="">Default Occasion</option>
+                      {occasions.map((o, idx) => (
+                        <option key={o.id || `occ-opt-${idx}`} value={o.id}>
                           {o.name}
                         </option>
                       ))}
@@ -271,7 +257,7 @@ export default function StylingPage() {
                   <div className="flex gap-4 flex-wrap justify-center items-center">
                     {selectedItemsList.map((item, i) => (
                       <motion.div
-                        key={item.id}
+                        key={item.id || `item-canvas-${i}`}
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         transition={{ delay: i * 0.05 }}
@@ -314,7 +300,7 @@ export default function StylingPage() {
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#867272]" />
                     <input
                       type="text"
-                      placeholder="Search 50+ items..."
+                      placeholder="Search items..."
                       value={itemSearch}
                       onChange={(e) => setItemSearch(e.target.value)}
                       className="w-full pl-9 pr-3 py-1.5 border border-[#d9c1c0] rounded-lg text-xs outline-none focus:border-[#380208]"
@@ -340,33 +326,37 @@ export default function StylingPage() {
                 </div>
 
                 {/* Grid View */}
-                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3 max-h-56 overflow-y-auto pr-1 pt-2">
-                  {filteredWardrobeItems.map((item) => (
-                    <button
-                      key={item.id}
-                      className={`aspect-square rounded-xl border-2 overflow-hidden transition-all relative ${
-                        selectedItems.has(item.id)
-                          ? 'border-[#380208] ring-2 ring-[#380208]/30 scale-95'
-                          : 'border-transparent opacity-75 hover:opacity-100'
-                      }`}
-                      onClick={() => toggleItem(item.id)}
-                      title={item.name}
-                    >
-                      <img
-                        src={item.image_url || 'https://images.unsplash.com/photo-1544441893-675973e31985?w=400&q=80'}
-                        alt={item.name}
-                        className="w-full h-full object-cover"
-                      />
-                      {selectedItems.has(item.id) && (
-                        <div className="absolute inset-0 bg-[#380208]/20 flex items-center justify-center">
-                          <span className="w-5 h-5 bg-[#380208] text-white rounded-full text-[10px] font-bold grid place-items-center">
-                            ✓
-                          </span>
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
+                {filteredWardrobeItems.length === 0 ? (
+                  <p className="text-xs text-[#867272] italic py-4 text-center">No wardrobe items match your filter.</p>
+                ) : (
+                  <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3 max-h-56 overflow-y-auto pr-1 pt-2">
+                    {filteredWardrobeItems.map((item, idx) => (
+                      <button
+                        key={item.id || `wardrobe-pick-${idx}`}
+                        className={`aspect-square rounded-xl border-2 overflow-hidden transition-all relative ${
+                          selectedItems.has(item.id)
+                            ? 'border-[#380208] ring-2 ring-[#380208]/30 scale-95'
+                            : 'border-transparent opacity-75 hover:opacity-100'
+                        }`}
+                        onClick={() => toggleItem(item.id)}
+                        title={item.name}
+                      >
+                        <img
+                          src={item.image_url || 'https://images.unsplash.com/photo-1544441893-675973e31985?w=400&q=80'}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                        />
+                        {selectedItems.has(item.id) && (
+                          <div className="absolute inset-0 bg-[#380208]/20 flex items-center justify-center">
+                            <span className="w-5 h-5 bg-[#380208] text-white rounded-full text-[10px] font-bold grid place-items-center">
+                              ✓
+                            </span>
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -378,8 +368,8 @@ export default function StylingPage() {
                     <Sparkles size={14} className="text-amber-300" />
                     <span>AI Advisor Verdict</span>
                   </div>
-                  <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                    {verdict?.status || 'Active'}
+                  <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider capitalize">
+                    {verdict?.status || 'Idle'}
                   </span>
                 </div>
 
@@ -389,25 +379,19 @@ export default function StylingPage() {
                 </div>
 
                 <p className="serif text-xl font-bold leading-snug text-amber-100">
-                  "{verdict?.verdictText || 'A timeless choice for the occasion.'}"
-                </p>
-                <p className="text-xs text-white/80 leading-relaxed">
-                  The color balance between primary and secondary pieces matches Formality Level {selectedOccasion ? '4' : '3'} flawlessly.
+                  "{verdict?.verdictText || 'Select wardrobe items to analyze outfit composition.'}"
                 </p>
 
-                <div className="flex flex-col gap-2 pt-2 border-t border-white/10">
-                  <p className="text-[10px] uppercase tracking-widest text-white/60 font-semibold">Suggested Additions</p>
-                  <div className="flex items-center gap-2 text-xs font-medium text-amber-200">
-                    <Plus size={14} /> Black Calfskin Loafers
+                {verdict?.status === 'processing' && (
+                  <div className="flex items-center gap-2 text-xs text-amber-200 animate-pulse">
+                    <div className="w-2 h-2 rounded-full bg-amber-400" />
+                    <span>Worker evaluating Gemini Vision verdict...</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs font-medium text-amber-200">
-                    <Plus size={14} /> Minimalist Silver Pocket Square
-                  </div>
-                </div>
+                )}
               </div>
 
               <button
-                className="w-full py-4 bg-[#380208] text-white rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20"
+                className="w-full py-4 bg-[#380208] text-white rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20 disabled:opacity-50"
                 onClick={handleGenerateCombos}
                 disabled={loading}
               >

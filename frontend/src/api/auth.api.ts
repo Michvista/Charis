@@ -1,14 +1,24 @@
 import { requestBackend, storeSession } from './client';
 import type { AuthSession, UserProfile } from '../lib/types';
 
-type AuthResponsePayload = {
+type LoginResponsePayload = {
   access: string;
   refresh: string;
   user: UserProfile;
 };
 
+type RegisterResponsePayload = {
+  user: UserProfile;
+  tokens?: {
+    access: string;
+    refresh: string;
+  };
+  access?: string;
+  refresh?: string;
+};
+
 export async function login(usernameOrEmail: string, password: string): Promise<AuthSession> {
-  const payload = await requestBackend<AuthResponsePayload>('/auth/login/', {
+  const payload = await requestBackend<LoginResponsePayload>('/auth/login/', {
     method: 'POST',
     body: {
       username: usernameOrEmail,
@@ -27,18 +37,22 @@ export async function login(usernameOrEmail: string, password: string): Promise<
 }
 
 export async function register(email: string, password: string, username?: string): Promise<AuthSession> {
-  const payload = await requestBackend<AuthResponsePayload>('/auth/register/', {
+  const payload = await requestBackend<RegisterResponsePayload>('/auth/register/', {
     method: 'POST',
     body: {
       email,
-      password,
       username: username || email.split('@')[0],
+      password,
+      password_confirm: password,
     },
   });
 
+  const accessToken = payload.tokens?.access || payload.access || '';
+  const refreshToken = payload.tokens?.refresh || payload.refresh || '';
+
   const session: AuthSession = {
-    accessToken: payload.access,
-    refreshToken: payload.refresh,
+    accessToken,
+    refreshToken,
     user: payload.user,
   };
 

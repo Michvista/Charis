@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/context/AuthContext';
 import { useToast } from '@/lib/context/ToastContext';
 import { listWardrobeItems, createWardrobeItem, deleteWardrobeItem, logWear } from '@/api/wardrobe.api';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Filter, Plus, X, Trash2, Shirt, Sparkles, Tag, Calendar, DollarSign, Eye } from 'lucide-react';
+import { Plus, X, Trash2, Shirt, Upload, Image as ImageIcon } from 'lucide-react';
 import type { WardrobeItem } from '@/lib/types';
 
 function WearDots({ count }: { count: number }) {
@@ -44,6 +44,11 @@ export default function WardrobePage() {
   const [newItemFormality, setNewItemFormality] = useState(3);
   const [newItemPrice, setNewItemPrice] = useState('150.00');
   const [newItemImageUrl, setNewItemImageUrl] = useState('');
+  
+  // Local File Upload state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string>('');
+  
   const [submitting, setSubmitting] = useState(false);
 
   const fetchItems = async () => {
@@ -63,6 +68,14 @@ export default function WardrobePage() {
     fetchItems();
   }, [session]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setFilePreview(URL.createObjectURL(file));
+    }
+  };
+
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!session?.accessToken || !newItemName.trim()) return;
@@ -77,17 +90,24 @@ export default function WardrobePage() {
       formData.append('formality_level', String(newItemFormality));
       formData.append('purchase_price', newItemPrice);
       formData.append('purchase_date', new Date().toISOString().split('T')[0]);
-      if (newItemImageUrl.trim()) {
+
+      if (selectedFile) {
+        formData.append('image', selectedFile);
+        formData.append('image_url', filePreview);
+      } else if (newItemImageUrl.trim()) {
         formData.append('image_url', newItemImageUrl.trim());
       }
 
       await createWardrobeItem(session.accessToken, formData);
       toastSuccess('Item Added', `"${newItemName}" has been curated to your wardrobe.`);
       setShowAddModal(false);
+      
       // Reset form
       setNewItemName('');
       setNewItemBrand('');
       setNewItemImageUrl('');
+      setSelectedFile(null);
+      setFilePreview('');
       fetchItems();
     } catch (err) {
       toastError('Failed to add item', err instanceof Error ? err.message : 'Error adding wardrobe item.');
@@ -117,7 +137,7 @@ export default function WardrobePage() {
       toastSuccess('Wear Logged', `Logged +1 wear for "${name}".`);
       fetchItems();
       if (selected?.id === id) {
-        setSelected(prev => prev ? { ...prev, times_worn: (prev.times_worn || 0) + 1 } : null);
+        setSelected((prev) => (prev ? { ...prev, times_worn: (prev.times_worn || 0) + 1 } : null));
       }
     } catch (err) {
       toastError('Log Wear Failed', err instanceof Error ? err.message : 'Could not log wear.');
@@ -127,7 +147,7 @@ export default function WardrobePage() {
   const filteredItems = useMemo(() => {
     let list = items;
     if (categoryFilter !== 'All') {
-      list = list.filter(i => i.category?.toLowerCase() === categoryFilter.toLowerCase());
+      list = list.filter((i) => i.category?.toLowerCase() === categoryFilter.toLowerCase());
     }
     return [...list].sort((a, b) => {
       if (sortBy === 'wears') return (b.times_worn || 0) - (a.times_worn || 0);
@@ -156,8 +176,8 @@ export default function WardrobePage() {
             <div className="flex items-center gap-3">
               <select
                 value={sortBy}
-                onChange={e => setSortBy(e.target.value as any)}
-                className="px-3 py-2 bg-white border border-[#d9c1c0] rounded-lg text-xs font-semibold text-[#1e1b18] outline-none focus:border-[#380208] cursor-pointer"
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="px-3 py-2 bg-white border border-[#d9c1c0] rounded-lg text-xs font-semibold text-[#1e1b18] outline-none cursor-pointer"
               >
                 <option value="newest">Sort: Newest First</option>
                 <option value="wears">Sort: Most Worn</option>
@@ -166,7 +186,7 @@ export default function WardrobePage() {
 
               <button
                 onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#380208] text-white text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all hover:-translate-y-0.5 shadow-md shadow-[#380208]/20"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#380208] text-white text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20"
               >
                 <Plus size={16} /> Add Item
               </button>
@@ -175,7 +195,7 @@ export default function WardrobePage() {
 
           {/* Category Filter Tabs */}
           <div className="flex items-center gap-2 border-b border-[#d9c1c0] overflow-x-auto pb-1">
-            {CATEGORIES.map(cat => (
+            {CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setCategoryFilter(cat)}
@@ -332,7 +352,7 @@ export default function WardrobePage() {
             </AnimatePresence>
           </div>
 
-          {/* Add Item Modal */}
+          {/* Add Item Modal with Local System Image File Upload */}
           <AnimatePresence>
             {showAddModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -353,12 +373,39 @@ export default function WardrobePage() {
                   </div>
 
                   <form onSubmit={handleAddItem} className="flex flex-col gap-4">
+                    {/* System Image Upload Area */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-[#544342]">Garment Image (Upload File)</label>
+                      <div className="relative border-2 border-dashed border-[#d9c1c0] hover:border-[#380208] rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-[#fbf2ed]">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileChange}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                        />
+                        {filePreview ? (
+                          <div className="relative w-full h-36 rounded-lg overflow-hidden">
+                            <img src={filePreview} alt="Preview" className="w-full h-full object-cover" />
+                            <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded font-medium">
+                              File Loaded
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-1.5 py-3 text-[#544342]">
+                            <Upload size={24} className="text-[#380208]" />
+                            <p className="text-xs font-semibold text-[#1e1b18]">Click or drag image file from your system</p>
+                            <p className="text-[10px] text-[#867272]">PNG, JPG, WEBP up to 10MB</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-semibold text-[#544342]">Item Name *</label>
                       <input
                         type="text"
                         value={newItemName}
-                        onChange={e => setNewItemName(e.target.value)}
+                        onChange={(e) => setNewItemName(e.target.value)}
                         placeholder="e.g. Italian Double-Breasted Trench"
                         className="py-2.5 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
                         required
@@ -370,7 +417,7 @@ export default function WardrobePage() {
                         <label className="text-xs font-semibold text-[#544342]">Category</label>
                         <select
                           value={newItemCategory}
-                          onChange={e => setNewItemCategory(e.target.value)}
+                          onChange={(e) => setNewItemCategory(e.target.value)}
                           className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208] cursor-pointer"
                         >
                           <option value="top">Top</option>
@@ -386,7 +433,7 @@ export default function WardrobePage() {
                         <input
                           type="text"
                           value={newItemBrand}
-                          onChange={e => setNewItemBrand(e.target.value)}
+                          onChange={(e) => setNewItemBrand(e.target.value)}
                           placeholder="e.g. Burberry"
                           className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
                         />
@@ -399,8 +446,8 @@ export default function WardrobePage() {
                         <input
                           type="text"
                           value={newItemColor}
-                          onChange={e => setNewItemColor(e.target.value)}
-                          placeholder="e.g. Camel or #380208"
+                          onChange={(e) => setNewItemColor(e.target.value)}
+                          placeholder="e.g. Camel"
                           className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
                         />
                       </div>
@@ -412,18 +459,18 @@ export default function WardrobePage() {
                           min="1"
                           max="5"
                           value={newItemFormality}
-                          onChange={e => setNewItemFormality(Number(e.target.value))}
+                          onChange={(e) => setNewItemFormality(Number(e.target.value))}
                           className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
                         />
                       </div>
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-[#544342]">Image URL (HD Unsplash / CDN)</label>
+                      <label className="text-xs font-semibold text-[#544342]">Or External Image URL (Optional)</label>
                       <input
                         type="url"
                         value={newItemImageUrl}
-                        onChange={e => setNewItemImageUrl(e.target.value)}
+                        onChange={(e) => setNewItemImageUrl(e.target.value)}
                         placeholder="https://images.unsplash.com/..."
                         className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
                       />

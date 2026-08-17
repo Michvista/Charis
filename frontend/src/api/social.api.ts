@@ -30,17 +30,27 @@ export async function voteOutfitShare(token: string, shareId: string, value: 1 |
     body: { value },
   });
 }
+export const voteShare = voteOutfitShare;
 
-export async function commentOutfitShare(token: string, shareId: string, text: string): Promise<OutfitShare['comments'][number]> {
+export async function commentOutfitShare(token: string, shareId: string, text: string): Promise<NonNullable<OutfitShare['comments']>[number]> {
   return requestBackend(`/social/shares/${shareId}/comments/`, {
     method: 'POST',
     token,
     body: { text },
   });
 }
+export const addComment = commentOutfitShare;
+
+export async function createFriendship(token: string, friendUserId: string): Promise<Friendship> {
+  return requestBackend<Friendship>('/social/friendships/', {
+    method: 'POST',
+    token,
+    body: { friend_user_id: friendUserId },
+  });
+}
 
 export async function listFriendships(token: string): Promise<Friendship[]> {
-  return requestBackend<Friendship[]>('/social/friends/', {
+  return requestBackend<Friendship[]>('/social/friendships/', {
     method: 'GET',
     token,
   });

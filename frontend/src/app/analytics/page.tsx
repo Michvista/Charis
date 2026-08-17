@@ -118,16 +118,16 @@ export default function AnalyticsPage() {
 
           {/* Charts Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Radar Category Distribution */}
+            {/* Radar Category Distribution — Fixed Height Container to prevent scroll unmounting */}
             <div className="bg-white rounded-2xl p-6 border border-[#d9c1c0] shadow-sm flex flex-col gap-4">
               <div className="flex justify-between items-center border-b border-[#d9c1c0]/40 pb-3">
                 <span className="eyebrow">Category Distribution</span>
                 <PieChart size={18} className="text-[#380208]" />
               </div>
 
-              <div className="h-72 w-full flex items-center justify-center relative">
+              <div className="h-72 min-h-[280px] w-full flex items-center justify-center relative">
                 {mounted ? (
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={280}>
                     <RadarChart data={radarData} cx="50%" cy="50%" outerRadius={90}>
                       <PolarGrid stroke="#d9c1c0" />
                       <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11, fill: '#1e1b18', fontWeight: 600 }} />
@@ -149,20 +149,22 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            {/* Wear Frequency Bar Chart */}
+            {/* Wear Frequency Bar Chart with Custom Tooltip Formatter displaying Wears Count */}
             <div className="bg-white rounded-2xl p-6 border border-[#d9c1c0] shadow-sm flex flex-col gap-4">
               <div className="flex justify-between items-center border-b border-[#d9c1c0]/40 pb-3">
                 <span className="eyebrow">Weekly Wear Frequency</span>
-                <span className="text-xs font-bold text-[#380208]">Peak: {maxDay.day}</span>
+                <span className="text-xs font-bold text-[#380208]">Peak: {maxDay.day} ({maxDay.count} Wears)</span>
               </div>
 
-              <div className="h-72 w-full pt-4">
+              <div className="h-72 min-h-[280px] w-full pt-4">
                 {mounted ? (
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={280}>
                     <BarChart data={barData} barSize={32}>
                       <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#544342', fontWeight: 600 }} />
                       <YAxis hide />
                       <Tooltip
+                        formatter={(value: any) => [`${value} Wears`, 'Wear Count']}
+                        labelFormatter={(label) => `Day: ${label}`}
                         contentStyle={{
                           background: '#1e1b18',
                           color: '#ffffff',

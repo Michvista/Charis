@@ -138,43 +138,50 @@ export default function TripsPage() {
               </div>
               <h1 className="serif text-4xl font-bold text-[#1e1b18] mt-1">Trip Planner</h1>
               <p className="text-sm text-[#544342]">
-                Organize itineraries and auto-generate optimized travel capsule packing lists.
+                Click any trip to inspect itinerary events and assigned packing capsule items.
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
-              {trips.length > 1 && (
-                <select
-                  value={trip?.id}
-                  onChange={(e) => {
-                    const found = trips.find((t) => t.id === e.target.value);
-                    if (found) setSelectedTrip(found);
-                  }}
-                  className="px-3 py-2.5 bg-white border border-[#d9c1c0] rounded-lg text-xs font-semibold text-[#1e1b18] outline-none cursor-pointer"
-                >
-                  {trips.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              )}
+            <button
+              onClick={() => setShowTripModal(true)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#380208] text-white text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20"
+            >
+              <Plus size={16} /> Plan New Trip
+            </button>
+          </div>
 
+          {/* Interactive Trip Selection Bar */}
+          <div className="flex gap-4 overflow-x-auto pb-2 border-b border-[#d9c1c0]/50">
+            {trips.map((t) => (
               <button
-                onClick={() => setShowTripModal(true)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#380208] text-white text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20"
+                key={t.id}
+                onClick={() => setSelectedTrip(t)}
+                className={`p-4 rounded-xl border flex flex-col gap-1 min-w-[220px] transition-all cursor-pointer text-left ${
+                  selectedTrip?.id === t.id
+                    ? 'bg-[#380208] text-white border-[#380208] shadow-md ring-2 ring-[#380208]/20'
+                    : 'bg-white text-[#1e1b18] border-[#d9c1c0] hover:border-[#380208]'
+                }`}
               >
-                <Plus size={16} /> Plan New Trip
+                <div className="flex justify-between items-center">
+                  <span className={`eyebrow ${selectedTrip?.id === t.id ? 'text-amber-200' : 'text-[#867272]'}`}>
+                    {t.destination}
+                  </span>
+                  <Luggage size={14} className={selectedTrip?.id === t.id ? 'text-white' : 'text-[#380208]'} />
+                </div>
+                <p className="serif text-lg font-bold truncate">{t.name}</p>
+                <p className={`text-[11px] ${selectedTrip?.id === t.id ? 'text-white/80' : 'text-[#867272]'}`}>
+                  {t.start_date} to {t.end_date}
+                </p>
               </button>
-            </div>
+            ))}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-8 items-start">
-            {/* Left: Itinerary */}
+            {/* Left: Selected Trip Details & Itinerary */}
             <div className="flex flex-col gap-6">
               <div className="bg-white rounded-2xl p-6 border border-[#d9c1c0] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <span className="eyebrow">2026 Travel Itinerary</span>
+                  <span className="eyebrow">Active Selected Trip</span>
                   <h2 className="serif text-3xl font-bold text-[#1e1b18] mt-1">{trip?.name ?? 'Paris Fashion Week 2026'}</h2>
                   <div className="flex gap-6 mt-2 text-xs text-[#544342]">
                     <div className="flex items-center gap-1.5 font-medium">
@@ -208,8 +215,8 @@ export default function TripsPage() {
               </div>
 
               <div className="flex justify-between items-center">
-                <h3 className="serif text-2xl font-semibold text-[#1e1b18]">Scheduled Events</h3>
-                <span className="text-xs text-[#867272]">{trip?.trip_events?.length || 0} Events Total</span>
+                <h3 className="serif text-2xl font-semibold text-[#1e1b18]">Events & Assigned Pieces</h3>
+                <span className="text-xs text-[#867272]">{trip?.trip_events?.length || 0} Events Scheduled</span>
               </div>
 
               <div className="flex flex-col gap-6 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-px before:bg-[#d9c1c0]">
@@ -221,13 +228,13 @@ export default function TripsPage() {
                         <div>
                           <span className="eyebrow text-[10px]">Formality Level {event.formality_required || 4}/5</span>
                           <h4 className="serif text-xl font-bold text-[#1e1b18] mt-0.5">{event.name}</h4>
-                          <p className="text-xs text-[#867272] mt-0.5">{event.date} · {event.location || 'Paris'}</p>
+                          <p className="text-xs text-[#867272] mt-0.5">{event.date} · {event.location || trip?.destination}</p>
                         </div>
                       </div>
 
                       {event.notes && <p className="text-xs text-[#544342] leading-relaxed">{event.notes}</p>}
 
-                      <div className="flex items-center gap-4 p-3 bg-[#fbf2ed] rounded-xl border border-[#d9c1c0]/40">
+                      <div className="flex items-center gap-4 p-3.5 bg-[#fbf2ed] rounded-xl border border-[#d9c1c0]/40">
                         <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 bg-white">
                           <img
                             src={demoWardrobe[i % demoWardrobe.length]?.image_url || 'https://images.unsplash.com/photo-1614252235316-8c857d38b5f4?w=100&q=80'}
@@ -240,7 +247,7 @@ export default function TripsPage() {
                           <p className="serif text-sm font-semibold text-[#1e1b18] mt-0.5">
                             {demoWardrobe[i % demoWardrobe.length]?.name || 'Classic Oxford & Trench'}
                           </p>
-                          <p className="text-xs text-[#867272]">Optimized for event formality</p>
+                          <p className="text-xs text-[#867272]">Matches event formality requirements</p>
                         </div>
                       </div>
                     </div>
@@ -249,15 +256,15 @@ export default function TripsPage() {
               </div>
             </div>
 
-            {/* Right: Packing Coverage */}
+            {/* Right: Assigned Packing List for Selected Trip */}
             <div className="bg-white rounded-2xl p-6 border border-[#d9c1c0] shadow-md flex flex-col gap-5 sticky top-6">
               <div className="flex justify-between items-center border-b border-[#d9c1c0]/50 pb-3">
-                <h3 className="serif text-xl font-bold text-[#1e1b18]">Packing Coverage</h3>
+                <h3 className="serif text-xl font-bold text-[#1e1b18]">Assigned Items for Trip</h3>
                 <Luggage size={20} className="text-[#380208]" />
               </div>
 
               <div className="flex justify-between items-center text-xs">
-                <span className="text-[#544342] font-medium">Event Coverage Score</span>
+                <span className="text-[#544342] font-medium">Event Coverage</span>
                 <span className="font-bold text-[#380208] text-sm">{coveredEvents}%</span>
               </div>
 
@@ -270,7 +277,7 @@ export default function TripsPage() {
                 />
               </div>
 
-              <h4 className="eyebrow mt-1">Generated Capsule Items</h4>
+              <h4 className="eyebrow mt-1">Assigned Packing Capsule</h4>
 
               <div className="flex flex-col gap-3 max-h-80 overflow-y-auto pr-1">
                 {packingList?.items?.length ? (

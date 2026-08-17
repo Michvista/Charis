@@ -4,7 +4,9 @@ const IS_SERVER = typeof window === 'undefined';
 const BACKEND_URL = IS_SERVER
   ? (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000/api')
   : '/api';
-const STYLING_URL = process.env.NEXT_PUBLIC_STYLING_URL ?? 'http://localhost:3300';
+const STYLING_URL = IS_SERVER
+  ? (process.env.NEXT_PUBLIC_STYLING_URL ?? 'http://localhost:3300')
+  : '/styling-api';
 
 const TOKEN_KEY = 'charis.access_token';
 const REFRESH_KEY = 'charis.refresh_token';

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { useAuth } from '@/lib/context/AuthContext';
@@ -9,10 +9,11 @@ import { listWardrobeItems } from '@/api/wardrobe.api';
 import { listOccasions, createOccasion, generateCombos, requestVerdict, fetchVerdict } from '@/api/styling.api';
 import { demoWardrobe, demoOccasions } from '@/data/demo';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Save, Share2, ChevronDown, Plus, X } from 'lucide-react';
+import { Sparkles, Save, Share2, ChevronDown, Plus, X, Search, Filter } from 'lucide-react';
 import type { WardrobeItem, Occasion, VerdictResponse } from '@/lib/types';
 
 const SEASON_CHIPS = ['Autumn', 'Winter', 'Spring', 'Summer'];
+const ITEM_CATEGORIES = ['All', 'top', 'bottom', 'outerwear', 'shoes', 'accessory'];
 
 export default function StylingPage() {
   const { session } = useAuth();
@@ -24,6 +25,10 @@ export default function StylingPage() {
   const [selectedSeasons, setSelectedSeasons] = useState<string[]>(['Autumn']);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set(['item-1', 'item-4', 'item-2']));
   
+  // Decluttering Filters for 50+ Wardrobe Items
+  const [itemSearch, setItemSearch] = useState('');
+  const [itemCategoryFilter, setItemCategoryFilter] = useState('All');
+
   const [verdict, setVerdict] = useState<VerdictResponse | null>({
     outfitId: 'demo-1',
     status: 'done',
@@ -46,7 +51,7 @@ export default function StylingPage() {
     ]).then(([items, occ]) => {
       if (items.length) {
         setWardrobeItems(items);
-        setSelectedItems(new Set(items.slice(0, 3).map(i => i.id)));
+        setSelectedItems(new Set(items.slice(0, 3).map((i) => i.id)));
       }
       if (occ.length) {
         setOccasions(occ);
@@ -121,8 +126,20 @@ export default function StylingPage() {
   }
 
   const score = verdict?.score ?? 92;
-
   const selectedItemsList = wardrobeItems.filter((i) => selectedItems.has(i.id));
+
+  // Decluttered Wardrobe List (Search + Category Filtered)
+  const filteredWardrobeItems = useMemo(() => {
+    return wardrobeItems.filter((item) => {
+      const matchesCat =
+        itemCategoryFilter === 'All' || item.category?.toLowerCase() === itemCategoryFilter.toLowerCase();
+      const matchesSearch =
+        !itemSearch.trim() ||
+        item.name.toLowerCase().includes(itemSearch.toLowerCase()) ||
+        item.brand?.toLowerCase().includes(itemSearch.toLowerCase());
+      return matchesCat && matchesSearch;
+    });
+  }, [wardrobeItems, itemCategoryFilter, itemSearch]);
 
   return (
     <AuthGuard>
@@ -225,22 +242,57 @@ export default function StylingPage() {
                 )}
               </div>
 
-              {/* Wardrobe Item Picker */}
-              <div className="flex flex-col gap-3">
-                <div className="flex justify-between items-center">
-                  <span className="eyebrow">Select From Wardrobe</span>
-                  <span className="text-xs text-[#867272]">{selectedItems.size} Selected</span>
+              {/* Decluttered Wardrobe Picker with Search & Filter Tabs */}
+              <div className="flex flex-col gap-3 bg-white rounded-2xl border border-[#d9c1c0] p-5 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#d9c1c0]/40 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="eyebrow">Select Wardrobe Items</span>
+                    <span className="text-xs font-bold bg-[#380208] text-white px-2 py-0.5 rounded-full">
+                      {selectedItems.size} Selected
+                    </span>
+                  </div>
+
+                  <div className="relative flex-1 max-w-xs">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#867272]" />
+                    <input
+                      type="text"
+                      placeholder="Search 50+ items..."
+                      value={itemSearch}
+                      onChange={(e) => setItemSearch(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 border border-[#d9c1c0] rounded-lg text-xs outline-none focus:border-[#380208]"
+                    />
+                  </div>
                 </div>
-                <div className="flex gap-3 overflow-x-auto pb-2">
-                  {wardrobeItems.map((item) => (
+
+                {/* Category Tabs */}
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {ITEM_CATEGORIES.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setItemCategoryFilter(cat)}
+                      className={`px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wider transition-colors ${
+                        itemCategoryFilter === cat
+                          ? 'bg-[#380208] text-white'
+                          : 'bg-[#fbf2ed] text-[#544342] hover:bg-[#d9c1c0]/50'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Grid View */}
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3 max-h-56 overflow-y-auto pr-1 pt-2">
+                  {filteredWardrobeItems.map((item) => (
                     <button
                       key={item.id}
-                      className={`w-24 h-24 rounded-xl flex-shrink-0 border-2 overflow-hidden transition-all relative ${
+                      className={`aspect-square rounded-xl border-2 overflow-hidden transition-all relative ${
                         selectedItems.has(item.id)
                           ? 'border-[#380208] ring-2 ring-[#380208]/30 scale-95'
                           : 'border-transparent opacity-75 hover:opacity-100'
                       }`}
                       onClick={() => toggleItem(item.id)}
+                      title={item.name}
                     >
                       <img
                         src={item.image_url || 'https://images.unsplash.com/photo-1544441893-675973e31985?w=400&q=80'}

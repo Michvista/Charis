@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
@@ -118,9 +119,18 @@ class FriendshipSerializer(serializers.ModelSerializer):
         friend_user_id = validated_data.pop("friend_user_id")
         addressee = User.objects.get(id=friend_user_id)
         requester = self.context["request"].user
-        friendship, _ = Friendship.objects.get_or_create(
+        existing = Friendship.objects.filter(
+            (
+                Q(requester=requester, addressee=addressee)
+                | Q(requester=addressee, addressee=requester)
+            )
+        ).first()
+        if existing:
+            raise serializers.ValidationError(
+                {"friend_user_id": "A friendship already exists between these users."}
+            )
+        return Friendship.objects.create(
             requester=requester,
             addressee=addressee,
-            defaults={"status": Friendship.Status.PENDING},
+            status=Friendship.Status.PENDING,
         )
-        return friendship

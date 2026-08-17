@@ -120,6 +120,10 @@ class OutfitShareFeedView(APIView):
 class FriendshipViewSet(viewsets.ModelViewSet):
     serializer_class = FriendshipSerializer
     permission_classes = [IsAuthenticated]
+    http_method_names = ["get", "post", "head", "options"]
+
+    def _get_friendship_for_action(self, pk):
+        return Friendship.objects.select_related("requester", "addressee").get(pk=pk)
 
     def get_queryset(self):
         return (
@@ -133,7 +137,7 @@ class FriendshipViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="accept")
     def accept(self, request, pk=None):
-        friendship = self.get_object()
+        friendship = self._get_friendship_for_action(pk)
         if friendship.addressee_id != request.user.id:
             raise PermissionDenied("Only the invited user can accept this friendship.")
 
@@ -147,7 +151,7 @@ class FriendshipViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="reject")
     def reject(self, request, pk=None):
-        friendship = self.get_object()
+        friendship = self._get_friendship_for_action(pk)
         if friendship.addressee_id != request.user.id:
             raise PermissionDenied("Only the invited user can reject this friendship.")
 

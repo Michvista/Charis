@@ -12,6 +12,9 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     environment:
       STYLING_SERVICE_URL: http://styling-service:3300
       STYLING_SERVICE_INTERNAL_TOKEN: ${INTERNAL_API_KEY}
@@ -30,6 +33,9 @@ services:
       - "3000:3300"
     env_file:
       - .env
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     environment:
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
       JWT_SECRET: ${JWT_SECRET}
@@ -45,6 +51,9 @@ services:
       - /app/node_modules
     env_file:
       - .env
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     command: sh -c "npm ci && npm run dev:watch"
     environment:
       DJANGO_INTERNAL_URL: http://backend:8000

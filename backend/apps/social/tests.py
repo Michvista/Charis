@@ -125,3 +125,136 @@ class OutfitShareAuthorizationTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.public_share.refresh_from_db()
         self.assertEqual(self.public_share.caption, "Updated by owner")
+
+
+class FriendshipLifecycleTests(APITestCase):
+    def setUp(self):
+        self.user_a = User.objects.create_user(
+            username="usera",
+            email="usera@example.com",
+            password="Password123!",
+        )
+        self.user_b = User.objects.create_user(
+            username="userb",
+            email="userb@example.com",
+            password="Password123!",
+        )
+        self.user_c = User.objects.create_user(
+            username="userc",
+            email="userc@example.com",
+            password="Password123!",
+        )
+        self.friendship_list_url = reverse("friendship-list")
+
+    def _auth(self, user):
+        token = RefreshToken.for_user(user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token.access_token}")
+
+    def _create_friendship(self, requester, addressee):
+        self._auth(requester)
+        response = self.client.post(
+            self.friendship_list_url,
+            {"friend_user_id": str(addressee.id)},
+            format="json",
+        )
+        return response
+
+    def test_bidirectional_duplicate_friendships_are_rejected(self):
+        first = self._create_friendship(self.user_a, self.user_b)
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+
+        duplicate_same_direction = self._create_friendship(self.user_a, self.user_b)
+        self.assertEqual(duplicate_same_direction.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("friend_user_id", duplicate_same_direction.data)
+
+        reverse_direction = self._create_friendship(self.user_b, self.user_a)
+        self.assertEqual(reverse_direction.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("friend_user_id", reverse_direction.data)
+
+    def test_reverse_request_is_rejected_after_acceptance(self):
+        created = self._create_friendship(self.user_a, self.user_b)
+        friendship_id = created.data["id"]
+
+        self._auth(self.user_b)
+        accept_url = reverse("friendship-accept", args=[friendship_id])
+        accept_response = self.client.post(accept_url, format="json")
+        self.assertEqual(accept_response.status_code, status.HTTP_200_OK)
+
+        reverse_request = self._create_friendship(self.user_b, self.user_a)
+        self.assertEqual(reverse_request.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_unrelated_user_can_request_friendship(self):
+        first = self._create_friendship(self.user_a, self.user_b)
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+
+        unrelated = self._create_friendship(self.user_c, self.user_a)
+        self.assertEqual(unrelated.status_code, status.HTTP_201_CREATED)
+
+    def test_requester_cannot_accept_own_request(self):
+        created = self._create_friendship(self.user_a, self.user_b)
+        friendship_id = created.data["id"]
+
+        self._auth(self.user_a)
+        accept_url = reverse("friendship-accept", args=[friendship_id])
+        response = self.client.post(accept_url, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_addressee_can_accept(self):
+        created = self._create_friendship(self.user_a, self.user_b)
+        friendship_id = created.data["id"]
+
+        self._auth(self.user_b)
+        accept_url = reverse("friendship-accept", args=[friendship_id])
+        response = self.client.post(accept_url, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], Friendship.Status.ACCEPTED)
+
+    def test_unauthorized_user_cannot_accept_or_reject(self):
+        created = self._create_friendship(self.user_a, self.user_b)
+        friendship_id = created.data["id"]
+
+        self._auth(self.user_c)
+        accept_url = reverse("friendship-accept", args=[friendship_id])
+        reject_url = reverse("friendship-reject", args=[friendship_id])
+
+        self.assertEqual(self.client.post(accept_url, format="json").status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.client.post(reject_url, format="json").status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_arbitrary_status_mutation_is_rejected(self):
+        created = self._create_friendship(self.user_a, self.user_b)
+        friendship_id = created.data["id"]
+
+        self._auth(self.user_b)
+        detail_url = reverse("friendship-detail", args=[friendship_id])
+        response = self.client.patch(detail_url, {"status": "accepted"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_requester_and_addressee_cannot_be_reassigned(self):
+        created = self._create_friendship(self.user_a, self.user_b)
+        friendship_id = created.data["id"]
+
+        self._auth(self.user_a)
+        detail_url = reverse("friendship-detail", args=[friendship_id])
+        response = self.client.patch(
+            detail_url,
+            {
+                "requester": str(self.user_c.id),
+                "addressee": str(self.user_c.id),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_unrelated_users_cannot_modify_or_delete_friendship(self):
+        created = self._create_friendship(self.user_a, self.user_b)
+        friendship_id = created.data["id"]
+
+        self._auth(self.user_c)
+        detail_url = reverse("friendship-detail", args=[friendship_id])
+
+        self.assertEqual(self.client.patch(detail_url, {"status": "rejected"}, format="json").status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        self.assertEqual(self.client.delete(detail_url).status_code, status.HTTP_405_METHOD_NOT_ALLOWED)

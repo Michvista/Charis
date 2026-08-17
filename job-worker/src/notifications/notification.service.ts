@@ -30,21 +30,32 @@ export class NotificationService {
    */
   async sendNotification(payload: NotificationPayload): Promise<boolean> {
     const redisKey = `notif:sent:${payload.dedupeKey}`;
-    const existing = await this.redis.get(redisKey);
+    const claimed = await this.redis.set(
+      redisKey,
+      `pending:${Date.now()}`,
+      "EX",
+      60 * 60,
+      "NX",
+    );
 
-    if (existing) {
+    if (claimed !== "OK") {
       return false;
     }
 
-    const timestamp = new Date().toISOString();
-    console.log("[notification]", {
-      userId: payload.userId,
-      type: payload.type,
-      message: payload.message,
-      timestamp,
-    });
+    try {
+      const timestamp = new Date().toISOString();
+      console.log("[notification]", {
+        userId: payload.userId,
+        type: payload.type,
+        message: payload.message,
+        timestamp,
+      });
 
-    await this.redis.set(redisKey, timestamp, "EX", 60 * 60);
-    return true;
+      await this.redis.set(redisKey, `sent:${timestamp}`, "EX", 60 * 60);
+      return true;
+    } catch (error) {
+      await this.redis.del(redisKey);
+      throw error;
+    }
   }
 }

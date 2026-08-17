@@ -217,14 +217,19 @@ export default function StylingPage() {
                   <label className="eyebrow">Occasion Context</label>
                   <div className="relative inline-flex items-center">
                     <select
-                      className="appearance-none py-3 pr-10 pl-4 border border-[#d9c1c0] rounded-xl serif text-lg font-semibold text-[#1e1b18] bg-white cursor-pointer min-w-52 outline-none focus:border-[#380208]"
+                      className="appearance-none py-3 pr-10 pl-4 border-2 border-[#d9c1c0] rounded-xl text-base font-semibold text-[#1e1b18] bg-white cursor-pointer min-w-[220px] outline-none focus:border-[#380208] shadow-sm"
                       value={selectedOccasion}
                       onChange={(e) => setSelectedOccasion(e.target.value)}
+                      style={{ color: '#1e1b18', backgroundColor: '#ffffff' }}
                     >
-                      <option value="">Default Occasion</option>
+                      <option value="" style={{ color: '#1e1b18', backgroundColor: '#ffffff' }}>Default Occasion</option>
                       {occasions.map((o, idx) => (
-                        <option key={o.id || `occ-opt-${idx}`} value={o.id}>
-                          {o.name}
+                        <option
+                          key={o.id || `occ-opt-${idx}`}
+                          value={o.id}
+                          style={{ color: '#1e1b18', backgroundColor: '#ffffff' }}
+                        >
+                          {o.name} (Level {o.formalityLevel}/5)
                         </option>
                       ))}
                     </select>

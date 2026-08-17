@@ -5,9 +5,9 @@ import { AppShell } from '@/components/layout/AppShell';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { useAuth } from '@/lib/context/AuthContext';
 import { useToast } from '@/lib/context/ToastContext';
-import { listWardrobeItems, createWardrobeItem, deleteWardrobeItem, logWear } from '@/api/wardrobe.api';
+import { listWardrobeItems, createWardrobeItem, deleteWardrobeItem, logWear, updateWardrobeItem } from '@/api/wardrobe.api';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Trash2, Shirt, Upload, Image as ImageIcon } from 'lucide-react';
+import { Plus, X, Trash2, Shirt, Upload, Edit2, Save } from 'lucide-react';
 import type { WardrobeItem } from '@/lib/types';
 
 function WearDots({ count }: { count: number }) {
@@ -44,12 +44,20 @@ export default function WardrobePage() {
   const [newItemFormality, setNewItemFormality] = useState(3);
   const [newItemPrice, setNewItemPrice] = useState('150.00');
   const [newItemImageUrl, setNewItemImageUrl] = useState('');
-  
-  // Local File Upload state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string>('');
-  
   const [submitting, setSubmitting] = useState(false);
+
+  // Edit Item Modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editItem, setEditItem] = useState<WardrobeItem | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editBrand, setEditBrand] = useState('');
+  const [editCategory, setEditCategory] = useState('top');
+  const [editFormality, setEditFormality] = useState(3);
+  const [editPrice, setEditPrice] = useState('');
+  const [editColor, setEditColor] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const fetchItems = async () => {
     if (!session?.accessToken) return;
@@ -93,7 +101,6 @@ export default function WardrobePage() {
 
       if (selectedFile) {
         formData.append('image', selectedFile);
-        formData.append('image_url', filePreview);
       } else if (newItemImageUrl.trim()) {
         formData.append('image_url', newItemImageUrl.trim());
       }
@@ -101,8 +108,6 @@ export default function WardrobePage() {
       await createWardrobeItem(session.accessToken, formData);
       toastSuccess('Item Added', `"${newItemName}" has been curated to your wardrobe.`);
       setShowAddModal(false);
-      
-      // Reset form
       setNewItemName('');
       setNewItemBrand('');
       setNewItemImageUrl('');
@@ -113,6 +118,43 @@ export default function WardrobePage() {
       toastError('Failed to add item', err instanceof Error ? err.message : 'Error adding wardrobe item.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const openEditModal = (item: WardrobeItem) => {
+    setEditItem(item);
+    setEditName(item.name);
+    setEditBrand(item.brand || '');
+    setEditCategory(item.category || 'top');
+    setEditFormality(item.formality_level || 3);
+    setEditPrice(item.purchase_price || '');
+    setEditColor(item.primary_color || '');
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!session?.accessToken || !editItem) return;
+
+    setSavingEdit(true);
+    try {
+      const updated = await updateWardrobeItem(session.accessToken, editItem.id, {
+        name: editName.trim(),
+        brand: editBrand.trim() || undefined,
+        category: editCategory,
+        formality_level: Number(editFormality),
+        purchase_price: editPrice || undefined,
+        primary_color: editColor || undefined,
+      });
+      toastSuccess('Item Updated', `"${editName}" has been updated.`);
+      setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+      if (selected?.id === updated.id) setSelected(updated);
+      setShowEditModal(false);
+      setEditItem(null);
+    } catch (err) {
+      toastError('Update Failed', err instanceof Error ? err.message : 'Could not update item.');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -254,6 +296,17 @@ export default function WardrobePage() {
                       <span className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase text-[#1e1b18]">
                         {item.category}
                       </span>
+                      {/* Edit button overlay */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditModal(item);
+                        }}
+                        className="absolute top-3 left-3 w-7 h-7 bg-white/90 rounded-full grid place-items-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-[#380208] hover:text-white text-[#380208]"
+                        title="Edit Item"
+                      >
+                        <Edit2 size={12} />
+                      </button>
                     </div>
 
                     <div className="flex flex-col gap-1 px-1">
@@ -265,6 +318,7 @@ export default function WardrobePage() {
                           <span
                             className="w-3 h-3 rounded-full border border-black/10 shrink-0"
                             style={{ background: item.primary_color }}
+                            title={`Color: ${item.primary_color}`}
                           />
                         )}
                       </div>
@@ -331,6 +385,19 @@ export default function WardrobePage() {
                         <p className="font-semibold text-[#380208] mt-0.5">{selected.times_worn || 0} times</p>
                       </div>
                     </div>
+
+                    {selected.primary_color && (
+                      <div className="flex items-center gap-2 bg-[#fbf2ed] p-2.5 rounded-lg border border-[#d9c1c0]/40">
+                        <span
+                          className="w-5 h-5 rounded-full border border-black/10 shrink-0"
+                          style={{ background: selected.primary_color }}
+                        />
+                        <div>
+                          <span className="eyebrow text-[10px]">Primary Color (Cloudinary Extracted)</span>
+                          <p className="font-semibold text-[#1e1b18] mt-0.5">{selected.primary_color}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-2.5 pt-2 border-t border-[#d9c1c0]/50">
@@ -339,6 +406,12 @@ export default function WardrobePage() {
                       className="w-full py-3 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all"
                     >
                       + Log Wear Today
+                    </button>
+                    <button
+                      onClick={() => openEditModal(selected)}
+                      className="w-full py-2.5 border border-[#d9c1c0] text-[#1e1b18] hover:border-[#380208] rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <Edit2 size={14} /> Edit Item Details
                     </button>
                     <button
                       onClick={() => handleDeleteItem(selected.id, selected.name)}
@@ -352,7 +425,7 @@ export default function WardrobePage() {
             </AnimatePresence>
           </div>
 
-          {/* Add Item Modal with Local System Image File Upload */}
+          {/* Add Item Modal */}
           <AnimatePresence>
             {showAddModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -360,7 +433,7 @@ export default function WardrobePage() {
                   initial={{ scale: 0.95, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.95, opacity: 0 }}
-                  className="bg-white rounded-2xl p-6 md:p-8 max-w-lg w-full shadow-2xl border border-[#d9c1c0] flex flex-col gap-6"
+                  className="bg-white rounded-2xl p-6 md:p-8 max-w-lg w-full shadow-2xl border border-[#d9c1c0] flex flex-col gap-6 max-h-[90vh] overflow-y-auto"
                 >
                   <div className="flex justify-between items-center border-b border-[#d9c1c0]/50 pb-4">
                     <div>
@@ -373,9 +446,9 @@ export default function WardrobePage() {
                   </div>
 
                   <form onSubmit={handleAddItem} className="flex flex-col gap-4">
-                    {/* System Image Upload Area */}
+                    {/* System Image Upload */}
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-[#544342]">Garment Image (Upload File)</label>
+                      <label className="text-xs font-semibold text-[#544342]">Garment Image (Upload from System)</label>
                       <div className="relative border-2 border-dashed border-[#d9c1c0] hover:border-[#380208] rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-[#fbf2ed]">
                         <input
                           type="file"
@@ -394,7 +467,7 @@ export default function WardrobePage() {
                           <div className="flex flex-col items-center gap-1.5 py-3 text-[#544342]">
                             <Upload size={24} className="text-[#380208]" />
                             <p className="text-xs font-semibold text-[#1e1b18]">Click or drag image file from your system</p>
-                            <p className="text-[10px] text-[#867272]">PNG, JPG, WEBP up to 10MB</p>
+                            <p className="text-[10px] text-[#867272]">PNG, JPG, WEBP — Cloudinary will extract primary color</p>
                           </div>
                         )}
                       </div>
@@ -442,12 +515,12 @@ export default function WardrobePage() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-semibold text-[#544342]">Primary Color</label>
+                        <label className="text-xs font-semibold text-[#544342]">Primary Color (fallback)</label>
                         <input
                           type="text"
                           value={newItemColor}
                           onChange={(e) => setNewItemColor(e.target.value)}
-                          placeholder="e.g. Camel"
+                          placeholder="e.g. Camel or #c4a882"
                           className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
                         />
                       </div>
@@ -482,6 +555,125 @@ export default function WardrobePage() {
                       className="w-full py-3.5 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20 disabled:opacity-50 mt-2"
                     >
                       {submitting ? 'Curating...' : 'Curate Item →'}
+                    </button>
+                  </form>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* Edit Item Modal */}
+          <AnimatePresence>
+            {showEditModal && editItem && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.95, opacity: 0 }}
+                  className="bg-white rounded-2xl p-6 md:p-8 max-w-lg w-full shadow-2xl border border-[#d9c1c0] flex flex-col gap-6 max-h-[90vh] overflow-y-auto"
+                >
+                  <div className="flex justify-between items-center border-b border-[#d9c1c0]/50 pb-4">
+                    <div>
+                      <span className="eyebrow">Edit Garment</span>
+                      <h2 className="serif text-2xl font-bold text-[#1e1b18]">Update Details</h2>
+                    </div>
+                    <button onClick={() => setShowEditModal(false)} className="text-[#867272] hover:text-[#380208]">
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleSaveEdit} className="flex flex-col gap-4">
+                    <div className="flex items-center gap-4 pb-3">
+                      <div className="w-20 h-20 rounded-xl overflow-hidden bg-[#f5ece7] shrink-0">
+                        <img
+                          src={editItem.image_url || 'https://images.unsplash.com/photo-1544441893-675973e31985?w=400&q=80'}
+                          alt={editItem.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <p className="text-xs text-[#867272] leading-relaxed">
+                        To update the image, delete this item and re-add with a new upload. Cloudinary automatically extracts the primary color when you upload an image.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-[#544342]">Item Name *</label>
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="py-2.5 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
+                        required
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-[#544342]">Category</label>
+                        <select
+                          value={editCategory}
+                          onChange={(e) => setEditCategory(e.target.value)}
+                          className="py-2 border-b border-[#d9c1c0] bg-white text-sm text-[#1e1b18] outline-none cursor-pointer"
+                        >
+                          <option value="top">Top</option>
+                          <option value="bottom">Bottom</option>
+                          <option value="outerwear">Outerwear</option>
+                          <option value="shoes">Shoes</option>
+                          <option value="accessory">Accessory</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-[#544342]">Brand</label>
+                        <input
+                          type="text"
+                          value={editBrand}
+                          onChange={(e) => setEditBrand(e.target.value)}
+                          className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-[#544342]">Formality (1-5)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="5"
+                          value={editFormality}
+                          onChange={(e) => setEditFormality(Number(e.target.value))}
+                          className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-[#544342]">Purchase Price</label>
+                        <input
+                          type="text"
+                          value={editPrice}
+                          onChange={(e) => setEditPrice(e.target.value)}
+                          placeholder="e.g. 450.00"
+                          className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-[#544342]">Primary Color Override</label>
+                      <input
+                        type="text"
+                        value={editColor}
+                        onChange={(e) => setEditColor(e.target.value)}
+                        placeholder="e.g. #c4a882 or 'camel'"
+                        className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={savingEdit}
+                      className="w-full py-3.5 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20 disabled:opacity-50 mt-2 flex items-center justify-center gap-2"
+                    >
+                      <Save size={14} /> {savingEdit ? 'Saving...' : 'Save Changes →'}
                     </button>
                   </form>
                 </motion.div>

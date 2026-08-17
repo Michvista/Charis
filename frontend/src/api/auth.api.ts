@@ -1,66 +1,64 @@
-import { requestBackend, storeSession, clearSession } from './client';
+import { requestBackend, storeSession } from './client';
 import type { AuthSession, UserProfile } from '../lib/types';
 
-type LoginResponse = {
+type AuthResponsePayload = {
   access: string;
   refresh: string;
   user: UserProfile;
 };
 
-type RegisterResponse = {
-  user: UserProfile;
-  tokens: {
-    access: string;
-    refresh: string;
-  };
-};
-
-export async function login(email: string, password: string): Promise<AuthSession> {
-  const response = await requestBackend<LoginResponse>('/auth/login/', {
+export async function login(usernameOrEmail: string, password: string): Promise<AuthSession> {
+  const payload = await requestBackend<AuthResponsePayload>('/auth/login/', {
     method: 'POST',
-    body: { email, password },
+    body: {
+      username: usernameOrEmail,
+      password,
+    },
   });
 
-  const session = {
-    accessToken: response.access,
-    refreshToken: response.refresh,
-    user: response.user,
+  const session: AuthSession = {
+    accessToken: payload.access,
+    refreshToken: payload.refresh,
+    user: payload.user,
   };
+
   storeSession(session);
   return session;
 }
 
-export async function register(payload: {
-  email: string;
-  username: string;
-  password: string;
-  password_confirm: string;
-  bio?: string;
-  avatar_url?: string;
-}): Promise<AuthSession> {
-  const response = await requestBackend<RegisterResponse>('/auth/register/', {
+export async function register(email: string, password: string, username?: string): Promise<AuthSession> {
+  const payload = await requestBackend<AuthResponsePayload>('/auth/register/', {
     method: 'POST',
-    body: payload,
+    body: {
+      email,
+      password,
+      username: username || email.split('@')[0],
+    },
   });
 
-  const session = {
-    accessToken: response.tokens.access,
-    refreshToken: response.tokens.refresh,
-    user: response.user,
+  const session: AuthSession = {
+    accessToken: payload.access,
+    refreshToken: payload.refresh,
+    user: payload.user,
   };
+
   storeSession(session);
   return session;
 }
 
-export async function fetchProfile(token: string) {
-  return requestBackend<UserProfile>('/auth/profile/', { token });
+export async function logout(accessToken: string, refreshToken: string): Promise<void> {
+  await requestBackend('/auth/logout/', {
+    method: 'POST',
+    token: accessToken,
+    body: {
+      refresh: refreshToken,
+    },
+  });
 }
 
-export async function logout(token: string, refreshToken: string) {
-  await requestBackend<{ message: string }>('/auth/logout/', {
-    method: 'POST',
+export async function fetchProfile(token: string): Promise<UserProfile> {
+  return requestBackend<UserProfile>('/auth/profile/', {
+    method: 'GET',
     token,
-    body: { refresh: refreshToken },
   });
-  clearSession();
 }

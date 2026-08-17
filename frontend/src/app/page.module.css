@@ -1,0 +1,211 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 64px;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  align-items: center;
+  min-height: 420px;
+}
+
+.heroCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.heroTitle {
+  font-family: var(--font-serif);
+  font-size: 56px;
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--color-on-surface);
+  letter-spacing: -0.02em;
+}
+
+.heroSubtitle {
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--color-on-surface-variant);
+  max-width: 380px;
+}
+
+.heroCtas {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ctaPrimary {
+  padding: 14px 28px;
+  background: var(--color-primary);
+  color: white;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 16px rgba(56, 2, 8, 0.25);
+}
+.ctaPrimary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(56, 2, 8, 0.3);
+}
+
+.ctaSecondary {
+  padding: 14px 28px;
+  border: 1.5px solid var(--color-outline-variant);
+  color: var(--color-on-surface);
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 15px;
+  transition: border-color 0.2s, transform 0.2s;
+  background: transparent;
+}
+.ctaSecondary:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
+}
+
+.heroVisual {
+  position: relative;
+}
+
+.heroImageWrap {
+  border-radius: 12px;
+  overflow: hidden;
+  aspect-ratio: 4/3;
+  box-shadow: var(--shadow-xl);
+}
+
+.heroImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.todaySuggestion {
+  position: absolute;
+  bottom: -16px;
+  right: 24px;
+  background: white;
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: var(--shadow-lg);
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.suggestionTitle {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-on-surface);
+}
+
+.suggestionMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-on-surface-variant);
+}
+
+.recentSection {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sectionTitle {
+  font-family: var(--font-serif);
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--color-on-surface);
+}
+
+.viewAll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--color-on-surface-variant);
+  font-weight: 500;
+  transition: color 0.2s;
+}
+.viewAll:hover {
+  color: var(--color-primary);
+}
+
+.itemGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.itemCard {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: transform 0.2s;
+}
+.itemCard:hover {
+  transform: translateY(-4px);
+}
+
+.itemImageWrap {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  aspect-ratio: 3/4;
+  background: var(--color-surface-container);
+}
+
+.itemImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.itemChip {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.itemMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.itemName {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-on-surface);
+}
+
+.itemBrand {
+  font-size: 13px;
+  color: var(--color-on-surface-variant);
+}

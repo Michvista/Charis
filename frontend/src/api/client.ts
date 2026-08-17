@@ -1,5 +1,5 @@
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000/api';
-const STYLING_URL = import.meta.env.VITE_STYLING_URL ?? import.meta.env.VITE_STYLING_SERVICE_URL ?? 'http://localhost:3000';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000/api';
+const STYLING_URL = process.env.NEXT_PUBLIC_STYLING_URL ?? 'http://localhost:3000';
 
 const TOKEN_KEY = 'charis.access_token';
 const REFRESH_KEY = 'charis.refresh_token';

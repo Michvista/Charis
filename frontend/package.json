@@ -1,27 +1,28 @@
 {
   "name": "charis-frontend",
+  "version": "0.1.0",
   "private": true,
-  "version": "1.0.0",
-  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "postinstall": "node scripts/fix-framer-motion.cjs"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
   },
   "dependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
     "clsx": "^2.1.1",
-    "framer-motion": "11.11.17",
+    "framer-motion": "^11.11.17",
     "lucide-react": "^0.475.0",
+    "next": "^15.1.0",
+    "postcss": "^8.5.26",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "recharts": "^2.15.0"
+    "recharts": "^2.15.0",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
-    "@types/react": "^19.0.10",
-    "@types/react-dom": "^19.0.4",
-    "@vitejs/plugin-react": "^4.3.4",
-    "typescript": "^5.7.2",
-    "vite": "^6.0.11"
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5"
   }
 }

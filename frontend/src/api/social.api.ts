@@ -1,36 +1,29 @@
 import { requestBackend } from './client';
 import type { Friendship, OutfitShare } from '../lib/types';
 
-export async function listSocialFeed(token: string) {
-  const response = await requestBackend<OutfitShare[] | { results?: OutfitShare[] }>('/social/feed/', { token });
-  return Array.isArray(response) ? response : response.results ?? [];
+export async function listSocialFeed(token: string): Promise<OutfitShare[]> {
+  return requestBackend<OutfitShare[]>('/social/feed/', {
+    method: 'GET',
+    token,
+  });
 }
 
-export async function listShares(token: string) {
-  const response = await requestBackend<OutfitShare[] | { results?: OutfitShare[] }>('/social/shares/', { token });
-  return Array.isArray(response) ? response : response.results ?? [];
-}
-
-export async function createShare(
-  token: string,
-  payload: { outfit_id: string; caption: string; visibility: 'public' | 'friends' | 'link_only' },
-) {
+export async function createOutfitShare(token: string, data: { outfit_id: string; caption: string; visibility?: 'public' | 'friends' | 'link_only' }): Promise<OutfitShare> {
   return requestBackend<OutfitShare>('/social/shares/', {
     method: 'POST',
     token,
-    body: payload,
+    body: data,
   });
 }
 
-export async function addComment(token: string, shareId: string, text: string) {
-  return requestBackend(`/social/shares/${shareId}/comments/`, {
-    method: 'POST',
+export async function getOutfitShare(token: string, id: string): Promise<OutfitShare> {
+  return requestBackend<OutfitShare>(`/social/shares/${id}/`, {
+    method: 'GET',
     token,
-    body: { text },
   });
 }
 
-export async function addVote(token: string, shareId: string, value: 1 | -1) {
+export async function voteOutfitShare(token: string, shareId: string, value: 1 | -1): Promise<{ vote_count: number; vote_breakdown: { upvotes: number; downvotes: number } }> {
   return requestBackend(`/social/shares/${shareId}/vote/`, {
     method: 'POST',
     token,
@@ -38,22 +31,17 @@ export async function addVote(token: string, shareId: string, value: 1 | -1) {
   });
 }
 
-export async function listFriendships(token: string) {
-  const response = await requestBackend<Friendship[] | { results?: Friendship[] }>('/social/friendships/', { token });
-  return Array.isArray(response) ? response : response.results ?? [];
-}
-
-export async function createFriendship(token: string, friendUserId: string) {
-  return requestBackend<Friendship>('/social/friendships/', {
+export async function commentOutfitShare(token: string, shareId: string, text: string): Promise<OutfitShare['comments'][number]> {
+  return requestBackend(`/social/shares/${shareId}/comments/`, {
     method: 'POST',
     token,
-    body: { friend_user_id: friendUserId },
+    body: { text },
   });
 }
 
-export async function acceptFriendship(token: string, friendshipId: string) {
-  return requestBackend<Friendship>(`/social/friendships/${friendshipId}/accept/`, {
-    method: 'POST',
+export async function listFriendships(token: string): Promise<Friendship[]> {
+  return requestBackend<Friendship[]>('/social/friends/', {
+    method: 'GET',
     token,
   });
 }

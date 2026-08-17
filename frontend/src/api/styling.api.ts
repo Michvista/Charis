@@ -1,63 +1,40 @@
-import { requestStyling, requestBackend } from './client';
-import type { Occasion, StylingItem, VerdictResponse, StyleAdvisorSuggestion } from '../lib/types';
+import { requestBackend, requestStyling } from './client';
+import type { Occasion, StylingCombo, StylingItem, StyleAdvisorSuggestion, VerdictResponse } from '../lib/types';
 
-export async function listOccasions(token: string) {
-  const response = await requestStyling<Occasion[]>('/occasions', { token, method: 'GET' });
-  return response;
-}
-
-export async function createOccasion(token: string, payload: { name: string; formalityLevel: number }) {
-  return requestStyling<Occasion>('/occasions', {
-    method: 'POST',
+export async function listOccasions(token: string): Promise<Occasion[]> {
+  return requestStyling<Occasion[]>('/styling/occasions/', {
+    method: 'GET',
     token,
-    body: payload,
   });
 }
 
-export async function generateVerdict(token: string, payload: {
-  occasionId?: string;
-  items: StylingItem[];
-}) {
-  return requestStyling<VerdictResponse>('/verdict', {
+export async function createOccasion(token: string, data: { name: string; formalityLevel: number }): Promise<Occasion> {
+  return requestStyling<Occasion>('/styling/occasions/', {
     method: 'POST',
     token,
-    body: payload,
+    body: data,
   });
 }
 
-export async function fetchVerdict(token: string, outfitId: string) {
-  return requestStyling<VerdictResponse>(`/verdict/${outfitId}`, { token, method: 'GET' });
-}
-
-export async function generateCombos(token: string, payload: {
-  occasionId?: string;
-  targetSeason?: string;
-  items: StylingItem[];
-}) {
-  return requestStyling<{ outfitId: string; status: string }>('/combos', {
+export async function generateCombos(token: string, data: { occasionId?: string; targetSeason?: string; items: StylingItem[] }): Promise<{ outfitId: string; status: string; combos: StylingCombo[] }> {
+  return requestStyling<{ outfitId: string; status: string; combos: StylingCombo[] }>('/styling/combos/generate/', {
     method: 'POST',
     token,
-    body: payload,
+    body: data,
   });
 }
 
-export async function completeStyleAdvisor(token: string, payload: {
-  occasion_description: string;
-  occasion_formality: number;
-  current_item_descriptions: string[];
-  occasion_id?: string | null;
-}) {
+export async function fetchVerdict(token: string, outfitId: string): Promise<VerdictResponse> {
+  return requestStyling<VerdictResponse>(`/styling/outfits/${outfitId}/verdict/`, {
+    method: 'GET',
+    token,
+  });
+}
+
+export async function completeStyleAdvisor(token: string, data: { occasion_description: string; occasion_formality?: number; current_item_descriptions?: string[] }): Promise<{ suggestions: StyleAdvisorSuggestion[] }> {
   return requestBackend<{ suggestions: StyleAdvisorSuggestion[] }>('/styleadvisor/complete/', {
     method: 'POST',
     token,
-    body: payload,
-  });
-}
-
-export async function uploadStyleKnowledge(token: string, payload: { content: string; tags?: string[] }) {
-  return requestBackend('/styleadvisor/knowledge/', {
-    method: 'POST',
-    token,
-    body: payload,
+    body: data,
   });
 }

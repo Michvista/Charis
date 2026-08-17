@@ -1,50 +1,39 @@
 import { requestBackend } from './client';
 import type { PackingList, Trip, TripEvent } from '../lib/types';
 
-export async function listTrips(token: string) {
-  const response = await requestBackend<Trip[] | { results?: Trip[] }>('/tripplanner/trips/', { token });
-  return Array.isArray(response) ? response : response.results ?? [];
+export async function listTrips(token: string): Promise<Trip[]> {
+  return requestBackend<Trip[]>('/tripplanner/trips/', {
+    method: 'GET',
+    token,
+  });
 }
 
-export async function createTrip(
-  token: string,
-  payload: {
-    name: string;
-    destination: string;
-    start_date: string;
-    end_date: string;
-    description?: string;
-    trip_events?: Omit<TripEvent, 'id' | 'created_at' | 'updated_at'>[];
-  },
-) {
+export async function createTrip(token: string, data: { name: string; destination: string; start_date: string; end_date: string; description?: string }): Promise<Trip> {
   return requestBackend<Trip>('/tripplanner/trips/', {
     method: 'POST',
     token,
-    body: payload,
+    body: data,
   });
 }
 
-export async function createTripEvent(
-  token: string,
-  tripId: string,
-  payload: {
-    name: string;
-    date: string;
-    formality_required: number;
-    location?: string;
-    notes?: string;
-  },
-) {
-  return requestBackend<TripEvent>(`/tripplanner/trips/${tripId}/events/`, {
-    method: 'POST',
+export async function getTrip(token: string, id: string): Promise<Trip> {
+  return requestBackend<Trip>(`/tripplanner/trips/${id}/`, {
+    method: 'GET',
     token,
-    body: payload,
   });
 }
 
-export async function generatePackingList(token: string, tripId: string) {
+export async function generatePackingList(token: string, tripId: string): Promise<PackingList> {
   return requestBackend<PackingList>(`/tripplanner/trips/${tripId}/generate-packing-list/`, {
     method: 'POST',
     token,
+  });
+}
+
+export async function createTripEvent(token: string, tripId: string, data: { name: string; date: string; formality_required: number; location?: string; notes?: string }): Promise<TripEvent> {
+  return requestBackend<TripEvent>(`/tripplanner/trips/${tripId}/events/`, {
+    method: 'POST',
+    token,
+    body: data,
   });
 }

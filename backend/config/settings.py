@@ -139,9 +139,6 @@ CORS_ALLOW_HEADERS = [
     "x-requested-with",
 ]
 
-# Prevent Django 301 redirects on POST requests missing trailing slashes
-APPEND_SLASH = False
-
 #   Redis                              ─
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")

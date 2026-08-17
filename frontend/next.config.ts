@@ -9,12 +9,16 @@ const nextConfig: NextConfig = {
   // Fix workspace root detection with multiple lockfiles
   outputFileTracingRoot: path.join(__dirname),
 
-  // Proxy /api/* to Django backend — eliminates CORS in browser
+  // Proxy /api/* to Django backend — ALWAYS ensuring trailing slash for Django endpoints
   async rewrites() {
     return [
       {
+        source: "/api/:path*/",
+        destination: `${backendBase}/api/:path*/`,
+      },
+      {
         source: "/api/:path*",
-        destination: `${backendBase}/api/:path*`,
+        destination: `${backendBase}/api/:path*/`,
       },
     ];
   },

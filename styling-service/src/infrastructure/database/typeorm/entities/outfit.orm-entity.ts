@@ -2,7 +2,7 @@
 
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
   CreateDateColumn,
   ManyToOne,
@@ -14,7 +14,7 @@ import { OutfitItemOrmEntity } from "./outfit-item.orm-entity";
 
 @Entity("outfits")
 export class OutfitOrmEntity {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryColumn({ type: "uuid", default: () => "gen_random_uuid()" })
   id!: string;
 
   @Column({ type: "uuid" })

@@ -1,6 +1,6 @@
 import 'reflect-metadata';
+import 'dotenv/config';
 import dns from 'node:dns';
-import dotenv from 'dotenv';
 import { DolphFactory } from '@dolphjs/dolph';
 import { AppDataSource, ensureStylingSchema } from './infrastructure/database/typeorm/data-source';
 import { OccasionComponent } from './presentation/http/components/occasion.component';
@@ -9,8 +9,6 @@ import { StylingComponent } from './presentation/http/components/styling.compone
 try {
   dns.setDefaultResultOrder('ipv4first');
 } catch {}
-
-dotenv.config();
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 

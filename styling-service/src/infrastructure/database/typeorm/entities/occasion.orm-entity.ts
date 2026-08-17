@@ -2,7 +2,7 @@
 
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
   CreateDateColumn,
   UpdateDateColumn,
@@ -10,7 +10,7 @@ import {
 
 @Entity("occasions")
 export class OccasionOrmEntity {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryColumn({ type: "uuid", default: () => "gen_random_uuid()" })
   id!: string;
 
   @Column({ type: "varchar", length: 100, unique: true })

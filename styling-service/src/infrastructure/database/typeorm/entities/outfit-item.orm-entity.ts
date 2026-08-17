@@ -2,7 +2,7 @@
 
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
   ManyToOne,
   JoinColumn,
@@ -11,7 +11,7 @@ import { OutfitOrmEntity } from "./outfit.orm-entity";
 
 @Entity("outfit_items")
 export class OutfitItemOrmEntity {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryColumn({ type: "uuid", default: () => "gen_random_uuid()" })
   id!: string;
 
   @ManyToOne(() => OutfitOrmEntity, (outfit) => outfit.items, {

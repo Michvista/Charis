@@ -254,8 +254,6 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-
-          </div>
         </div>
       </div>
 
@@ -286,4 +284,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
 

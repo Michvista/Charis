@@ -62,7 +62,7 @@ def enqueue_tagging_job(item_id: str, image_url: str = "") -> None:
         redis_url = getattr(settings, "REDIS_URL", "redis://redis:6379")
         r = redis_lib.from_url(redis_url, decode_responses=True)
 
-        queue_name = "wardrobe-tagging"
+        queue_name = "wardrobe-tagging" 
         job_id = str(uuid.uuid4())
         timestamp = int(time.time() * 1000)
 

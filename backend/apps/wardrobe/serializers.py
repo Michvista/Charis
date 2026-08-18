@@ -27,7 +27,7 @@ class WardrobeItemSerializer(serializers.ModelSerializer):
             'times_worn', 'purchase_price', 'purchase_date', 
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'user', 'image_url', 'tagging_status', 'times_worn', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'user', 'image_url', 'times_worn', 'created_at', 'updated_at']
 
 
 class WearLogSerializer(serializers.ModelSerializer):

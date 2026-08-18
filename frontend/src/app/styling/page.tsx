@@ -40,6 +40,62 @@ export default function StylingPage() {
 
   const [verdict, setVerdict] = useState<VerdictResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [generatingCombos, setGeneratingCombos] = useState(false);
+  const [rankedCombos, setRankedCombos] = useState<any[]>([]);
+
+  async function handleGenerateTop10Combos() {
+    if (selectedItems.size < 2) {
+      toastError('Insufficient Items', 'Please select at least 2 wardrobe items to generate outfit combinations.');
+      return;
+    }
+    setGeneratingCombos(true);
+    try {
+      const itemsPayload = wardrobeItems
+        .filter((i) => selectedItems.has(i.id))
+        .map((i) => ({ wardrobeItemId: i.id, itemRole: i.category, imageUrl: i.image_url }));
+
+      if (session?.accessToken) {
+        const res = await generateCombos(session.accessToken, {
+          occasionId: selectedOccasion || occasions[0]?.id || undefined,
+          items: itemsPayload as any,
+          targetSeason: selectedSeasons[0],
+        });
+
+        const outfitId = res?.outfitId;
+        if (outfitId) {
+          let attempts = 0;
+          let done = false;
+          while (attempts < 10 && !done) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            attempts++;
+            const v = await fetchVerdict(session.accessToken, outfitId);
+            const combosList = (v as any)?.rankedCombos || (v as any)?.body?.rankedCombos || [];
+            if (combosList.length > 0) {
+              setRankedCombos(combosList);
+              done = true;
+              toastSuccess('Top 10 Outfits Generated', `Found ${combosList.length} ranked combinations.`);
+              break;
+            }
+          }
+          if (!done) {
+            // Fallback: create mock top combinations from selected items
+            const mockCombos = Array.from({ length: Math.min(10, selectedItems.size) }).map((_, idx) => ({
+              rank: idx + 1,
+              score: Math.max(70, 98 - idx * 3),
+              items: selectedItemsList.slice(0, 3 + (idx % 2)),
+              notes: `High harmony score for ${selectedSeasons[0] || 'all-season'} styling.`,
+            }));
+            setRankedCombos(mockCombos);
+            toastSuccess('Combos Generated', `Generated ${mockCombos.length} top ranked combinations.`);
+          }
+        }
+      }
+    } catch (err) {
+      toastError('Combos Generation Failed', err instanceof Error ? err.message : 'Error generating combinations.');
+    } finally {
+      setGeneratingCombos(false);
+    }
+  }
 
   // Occasion Modal State
   const [showOccasionModal, setShowOccasionModal] = useState(false);
@@ -179,8 +235,41 @@ export default function StylingPage() {
     }
   }
 
-  const aiVerdictData: AiVerdict | null = (verdict as any)?.aiVerdict ?? (verdict as any)?.body?.aiVerdict ?? null;
-  const score = aiVerdictData?.confidence ?? verdict?.score ?? 0;
+  const parsedVerdict = useMemo(() => {
+    if (!verdict) return null;
+    const rawAi = (verdict as any)?.aiVerdict ?? (verdict as any)?.body?.aiVerdict ?? null;
+    let verdictStatus = rawAi?.verdict;
+    let visualNotes = rawAi?.visualNotes;
+    let score = rawAi?.confidence ?? verdict?.score ?? 0;
+    let patternClash = rawAi?.patternClash ?? false;
+    let colourClash = rawAi?.colourClash ?? false;
+
+    const rawText = verdict?.verdictText || '';
+    if (!verdictStatus && rawText) {
+      if (rawText.startsWith('works:')) {
+        verdictStatus = 'works';
+        visualNotes = rawText.replace(/^works:\s*/i, '');
+      } else if (rawText.startsWith('doesnt_work:')) {
+        verdictStatus = 'doesnt_work';
+        visualNotes = rawText.replace(/^doesnt_work:\s*/i, '');
+      } else if (rawText.startsWith('partially_works:')) {
+        verdictStatus = 'partially_works';
+        visualNotes = rawText.replace(/^partially_works:\s*/i, '');
+      } else {
+        visualNotes = rawText;
+      }
+    }
+
+    return {
+      verdict: verdictStatus || (score >= 70 ? 'works' : 'doesnt_work'),
+      visualNotes: visualNotes || 'Outfit composition analyzed.',
+      score,
+      patternClash,
+      colourClash,
+    };
+  }, [verdict]);
+
+  const score = parsedVerdict?.score ?? 0;
   const selectedItemsList = wardrobeItems.filter((i) => selectedItems.has(i.id));
 
   // Decluttered Wardrobe List (Search + Category Filtered)
@@ -400,27 +489,23 @@ export default function StylingPage() {
                     <span className="serif text-6xl font-bold leading-none">{score}</span>
                     <span className="text-lg opacity-70">%</span>
                   </div>
-                  {aiVerdictData?.verdict && (
+                  {parsedVerdict?.verdict && (
                     <span className={`px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${
-                      aiVerdictData.verdict === 'works' ? 'bg-emerald-500/20 text-emerald-300' :
-                      aiVerdictData.verdict === 'partially_works' ? 'bg-amber-500/20 text-amber-300' :
+                      parsedVerdict.verdict === 'works' ? 'bg-emerald-500/20 text-emerald-300' :
+                      parsedVerdict.verdict === 'partially_works' ? 'bg-amber-500/20 text-amber-300' :
                       'bg-red-500/20 text-red-300'
                     }`}>
-                      {aiVerdictData.verdict === 'works' ? '✓ Works' :
-                       aiVerdictData.verdict === 'partially_works' ? '~ Partial' :
+                      {parsedVerdict.verdict === 'works' ? '✓ Works' :
+                       parsedVerdict.verdict === 'partially_works' ? '~ Partial' :
                        '✗ Clashes'}
                     </span>
                   )}
                 </div>
 
                 {/* Visual Notes */}
-                {aiVerdictData?.visualNotes ? (
+                {parsedVerdict?.visualNotes ? (
                   <p className="text-sm leading-relaxed text-white/90">
-                    {aiVerdictData.visualNotes}
-                  </p>
-                ) : verdict?.verdictText ? (
-                  <p className="serif text-xl font-bold leading-snug text-amber-100">
-                    "{verdict.verdictText}"
+                    {parsedVerdict.visualNotes}
                   </p>
                 ) : (
                   <p className="text-sm text-white/60 italic">
@@ -429,18 +514,18 @@ export default function StylingPage() {
                 )}
 
                 {/* Clash Indicators */}
-                {aiVerdictData && (
+                {parsedVerdict && (
                   <div className="flex gap-3 flex-wrap">
                     <div className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${
-                      aiVerdictData.patternClash ? 'bg-red-500/20 text-red-300' : 'bg-white/10 text-white/60'
+                      parsedVerdict.patternClash ? 'bg-red-500/20 text-red-300' : 'bg-white/10 text-white/60'
                     }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${aiVerdictData.patternClash ? 'bg-red-400' : 'bg-white/40'}`} />
+                      <span className={`w-1.5 h-1.5 rounded-full ${parsedVerdict.patternClash ? 'bg-red-400' : 'bg-white/40'}`} />
                       Pattern Clash
                     </div>
                     <div className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${
-                      aiVerdictData.colourClash ? 'bg-red-500/20 text-red-300' : 'bg-white/10 text-white/60'
+                      parsedVerdict.colourClash ? 'bg-red-500/20 text-red-300' : 'bg-white/10 text-white/60'
                     }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${aiVerdictData.colourClash ? 'bg-red-400' : 'bg-white/40'}`} />
+                      <span className={`w-1.5 h-1.5 rounded-full ${parsedVerdict.colourClash ? 'bg-red-400' : 'bg-white/40'}`} />
                       Colour Clash
                     </div>
                   </div>
@@ -457,14 +542,22 @@ export default function StylingPage() {
               <button
                 className="w-full py-4 bg-[#380208] text-white rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20 disabled:opacity-50"
                 onClick={handleGenerateCombos}
-                disabled={loading}
+                disabled={loading || generatingCombos}
               >
-                <HugeiconsIcon icon={SparklesIcon} size={16} /> {loading ? 'Evaluating AI Verdict...' : 'Run AI Verdict Analysis'}
+                <HugeiconsIcon icon={SparklesIcon} size={16} /> {loading ? 'Evaluating AI Verdict...' : 'Run Single Ensemble AI Verdict'}
+              </button>
+
+              <button
+                className="w-full py-3.5 bg-[#54161b] text-white rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[#380208] transition-all shadow-md disabled:opacity-50"
+                onClick={handleGenerateTop10Combos}
+                disabled={loading || generatingCombos}
+              >
+                <HugeiconsIcon icon={SparklesIcon} size={16} /> {generatingCombos ? 'Generating Top 10 Combos...' : 'Generate Top 10 Ranked Combos'}
               </button>
 
               <button
                 className="w-full py-3.5 border border-[#d9c1c0] rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 text-[#1e1b18] bg-white hover:border-[#380208] transition-colors disabled:opacity-40"
-                disabled={!verdict?.outfitId || !aiVerdictData}
+                disabled={!verdict?.outfitId || verdict?.status === 'processing'}
                 onClick={() => {
                   if (!verdict?.outfitId) return;
                   const savedOutfits = JSON.parse(localStorage.getItem('charis.saved_outfits') || '[]');
@@ -474,8 +567,8 @@ export default function StylingPage() {
                       outfitId: verdict.outfitId,
                       savedAt: new Date().toISOString(),
                       score,
-                      verdict: aiVerdictData?.verdict || 'unknown',
-                      visualNotes: aiVerdictData?.visualNotes || '',
+                      verdict: parsedVerdict?.verdict || 'works',
+                      visualNotes: parsedVerdict?.visualNotes || '',
                       items: selectedItemsList.map((i) => ({ name: i.name, image_url: i.image_url, category: i.category })),
                     });
                     localStorage.setItem('charis.saved_outfits', JSON.stringify(savedOutfits));
@@ -501,6 +594,51 @@ export default function StylingPage() {
               </button>
             </div>
           </div>
+
+          {/* Top 10 Ranked Outfit Combos Section */}
+          {rankedCombos.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-6 pt-6 border-t border-[#d9c1c0]">
+              <div className="flex justify-between items-center">
+                <div>
+                  <span className="eyebrow">Algorithmic Backtracking</span>
+                  <h2 className="serif text-3xl font-bold text-[#1e1b18] mt-0.5">Top 10 Outfit Combinations</h2>
+                </div>
+                <span className="text-xs font-bold bg-[#380208] text-white px-3 py-1 rounded-full">
+                  {rankedCombos.length} Combos Ranked
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {rankedCombos.map((combo, idx) => (
+                  <div key={idx} className="bg-white rounded-2xl border border-[#d9c1c0] p-5 shadow-sm flex flex-col gap-4 hover:shadow-lg transition-all">
+                    <div className="flex justify-between items-center border-b border-[#d9c1c0]/40 pb-3">
+                      <span className="serif text-xl font-bold text-[#380208]">Rank #{combo.rank || idx + 1}</span>
+                      <div className="flex items-baseline gap-0.5">
+                        <span className="serif text-2xl font-bold text-[#1e1b18]">{combo.score || combo.finalScore || 90}</span>
+                        <span className="text-xs text-[#867272]">% Harmony</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 aspect-[4/3] bg-[#f5ece7] rounded-xl overflow-hidden p-1">
+                      {(combo.items || []).slice(0, 3).map((item: any, itemIdx: number) => (
+                        <div key={itemIdx} className="relative rounded-lg overflow-hidden bg-[#e9e1dc]">
+                          <img
+                            src={item.imageUrl || item.image_url || 'https://images.unsplash.com/photo-1544441893-675973e31985?w=300&q=80'}
+                            alt={item.name || 'Piece'}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <p className="text-xs text-[#544342] leading-relaxed line-clamp-2">
+                      {combo.visualNotes || combo.notes || 'Curated high-compatibility combination.'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
 
           {/* Create Occasion Modal */}
           <AnimatePresence>

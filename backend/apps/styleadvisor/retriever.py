@@ -47,7 +47,7 @@ def retrieve_relevant_chunks(query: str, top_k: int = 5, model_name: str | None 
 
     selected_model = model_name or os.getenv(
         "STYLEADVISOR_RETRIEVER_MODEL",
-        os.getenv("STYLEADVISOR_MODEL", "gemini-2.5-flash"),
+        os.getenv("STYLEADVISOR_MODEL", "gemini-1.5-flash"),
     )
     raw_text = generate_gemini_text(selected_model, "\n".join(prompt_lines))
 

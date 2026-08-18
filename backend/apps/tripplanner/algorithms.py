@@ -45,12 +45,9 @@ def _item_seasons(item: WardrobeItem) -> set[str]:
 
 def _item_covers_event(item: WardrobeItem, event: TripEvent) -> bool:
     item_seasons = _item_seasons(item)
-    if not item_seasons:
-        return False
-
     event_season = _season_for_date(event.date)
     formality_match = abs((item.formality_level or 0) - (event.formality_required or 0)) <= 1
-    season_match = event_season in item_seasons
+    season_match = (not item_seasons) or (event_season in item_seasons)
     return formality_match and season_match
 
 

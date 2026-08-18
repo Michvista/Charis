@@ -35,12 +35,27 @@ export default function SocialPage() {
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
   const [submittingComment, setSubmittingComment] = useState<Record<string, boolean>>({});
 
+  const [selectedOutfitId, setSelectedOutfitId] = useState<string>('');
+  const [savedOutfitsList, setSavedOutfitsList] = useState<any[]>([]);
+
   // Profile tab: search
   const [profileSearch, setProfileSearch] = useState('');
   const [friendships, setFriendships] = useState<any[]>([]);
   const [requestedFriends, setRequestedFriends] = useState<Set<string>>(new Set());
   const [expandedSearchPost, setExpandedSearchPost] = useState<string | null>(null);
   const [viewingUser, setViewingUser] = useState<{ userId: string; userEmail: string } | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('charis.saved_outfits');
+      if (raw) setSavedOutfitsList(JSON.parse(raw));
+    } catch {}
+  }, []);
+
+  const formatUserHandle = (email?: string) => {
+    if (!email) return 'CURATOR';
+    return email.split('@')[0].split('+')[0].toUpperCase();
+  };
 
   const loadData = async () => {
     if (!session?.accessToken) return;
@@ -71,15 +86,17 @@ export default function SocialPage() {
 
     setSubmittingPost(true);
     try {
-      // outfit_id is required by API — use a placeholder UUID if not selecting one
+      // Generate a fresh UUID for outfit_id if not selected to satisfy unique constraint
+      const finalOutfitId = selectedOutfitId || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `00000000-0000-4000-8000-${Date.now().toString(16).padStart(12, '0')}`);
       const newShare = await createOutfitShare(session.accessToken, {
-        outfit_id: '00000000-0000-0000-0000-000000000001',
+        outfit_id: finalOutfitId,
         caption: postCaption.trim(),
         visibility: postVisibility,
       });
       toastSuccess('Post Published', 'Your look has been shared to the Charis community feed.');
       setShares((prev) => [newShare, ...prev]);
       setPostCaption('');
+      setSelectedOutfitId('');
     } catch (err) {
       toastError('Post Failed', err instanceof Error ? err.message : 'Error sharing post.');
     } finally {
@@ -269,6 +286,23 @@ export default function SocialPage() {
                         rows={2}
                         required
                       />
+                      {savedOutfitsList.length > 0 && (
+                        <div className="flex items-center gap-2 border-t border-[#d9c1c0]/30 pt-2">
+                          <span className="text-[11px] text-[#867272] font-medium shrink-0">Attach Outfit:</span>
+                          <select
+                            value={selectedOutfitId}
+                            onChange={(e) => setSelectedOutfitId(e.target.value)}
+                            className="text-xs text-[#1e1b18] bg-[#fbf2ed] border border-[#d9c1c0] rounded-md px-2 py-1 outline-none cursor-pointer flex-1"
+                          >
+                            <option value="">(None selected)</option>
+                            {savedOutfitsList.map((o: any) => (
+                              <option key={o.outfitId} value={o.outfitId}>
+                                {o.verdict === 'works' ? '✓' : '~'} Outfit ({o.score}%) — {o.items?.map((i: any) => i.name).join(', ') || o.outfitId.slice(0, 8)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                       <div className="flex justify-between items-center border-t border-[#d9c1c0]/40 pt-3">
                         <select
                           value={postVisibility}
@@ -320,10 +354,12 @@ export default function SocialPage() {
                               {(share.user_email?.[0] || 'C').toUpperCase()}
                             </div>
                             <div>
-                              <p className="text-xs font-bold tracking-wider text-[#1e1b18]">
-                                {share.user_email?.split('@')[0]?.toUpperCase() ?? 'CURATOR'}
+                              <p className="text-xs font-bold text-[#1e1b18]">
+                                {formatUserHandle(share.user_email)}
                               </p>
-                              <p className="text-[10px] text-[#867272]">2026 · {share.visibility || 'Public'}</p>
+                              <p className="text-[10px] text-[#867272]">
+                                {new Date(share.shared_at || share.created_at).toLocaleDateString()}
+                              </p>
                             </div>
                           </div>
                           {share.user !== session?.user?.id && (

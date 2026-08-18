@@ -39,6 +39,7 @@ export class CombosController extends DolphControllerHandler<Dolph> {
       userId = (req.body && typeof req.body.userId === "string" && req.body.userId) || "00000000-0000-0000-0000-000000000000";
     }
 
+    const body = req.body ?? {};
     const dto: GenerateCombosDTO = {
       ...body,
       userId,

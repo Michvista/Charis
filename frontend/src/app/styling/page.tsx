@@ -540,23 +540,31 @@ export default function StylingPage() {
               </div>
 
               <button
-                className="w-full py-4 bg-[#380208] text-white rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20 disabled:opacity-50"
+                className={`w-full py-4 bg-[#380208] text-white rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20 ${
+                  loading ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                }`}
                 onClick={handleGenerateCombos}
-                disabled={loading || generatingCombos}
+                disabled={loading}
               >
                 <HugeiconsIcon icon={SparklesIcon} size={16} /> {loading ? 'Evaluating AI Verdict...' : 'Run Single Ensemble AI Verdict'}
               </button>
 
               <button
-                className="w-full py-3.5 bg-[#54161b] text-white rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[#380208] transition-all shadow-md disabled:opacity-50"
+                className={`w-full py-3.5 bg-[#54161b] text-white rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[#380208] transition-all shadow-md ${
+                  generatingCombos ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                }`}
                 onClick={handleGenerateTop10Combos}
-                disabled={loading || generatingCombos}
+                disabled={generatingCombos}
               >
                 <HugeiconsIcon icon={SparklesIcon} size={16} /> {generatingCombos ? 'Generating Top 10 Combos...' : 'Generate Top 10 Ranked Combos'}
               </button>
 
               <button
-                className="w-full py-3.5 border border-[#d9c1c0] rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 text-[#1e1b18] bg-white hover:border-[#380208] transition-colors disabled:opacity-40"
+                className={`w-full py-3.5 border rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
+                  !verdict?.outfitId || verdict?.status === 'processing'
+                    ? 'border-[#d9c1c0]/40 text-[#867272]/50 bg-gray-50/50 opacity-40 cursor-not-allowed'
+                    : 'border-[#d9c1c0] text-[#1e1b18] bg-white hover:border-[#380208] cursor-pointer'
+                }`}
                 disabled={!verdict?.outfitId || verdict?.status === 'processing'}
                 onClick={() => {
                   if (!verdict?.outfitId) return;

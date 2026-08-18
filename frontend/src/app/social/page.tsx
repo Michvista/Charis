@@ -286,23 +286,25 @@ export default function SocialPage() {
                         rows={2}
                         required
                       />
-                      {savedOutfitsList.length > 0 && (
-                        <div className="flex items-center gap-2 border-t border-[#d9c1c0]/30 pt-2">
-                          <span className="text-[11px] text-[#867272] font-medium shrink-0">Attach Outfit:</span>
+                      <div className="flex flex-col gap-2 border-t border-[#d9c1c0]/30 pt-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-[#867272] font-semibold shrink-0">Attach Outfit / Garment:</span>
                           <select
                             value={selectedOutfitId}
                             onChange={(e) => setSelectedOutfitId(e.target.value)}
-                            className="text-xs text-[#1e1b18] bg-[#fbf2ed] border border-[#d9c1c0] rounded-md px-2 py-1 outline-none cursor-pointer flex-1"
+                            className="text-xs text-[#1e1b18] bg-[#fbf2ed] border border-[#d9c1c0] rounded-md px-2.5 py-1.5 outline-none cursor-pointer flex-1"
                           >
-                            <option value="">(None selected)</option>
-                            {savedOutfitsList.map((o: any) => (
-                              <option key={o.outfitId} value={o.outfitId}>
-                                {o.verdict === 'works' ? '✓' : '~'} Outfit ({o.score}%) — {o.items?.map((i: any) => i.name).join(', ') || o.outfitId.slice(0, 8)}
-                              </option>
-                            ))}
+                            <option value="">(Optional: Attach Saved Outfit or Item)</option>
+                            <optgroup label="Saved Outfits Archive">
+                              {savedOutfitsList.map((o: any) => (
+                                <option key={o.outfitId} value={o.outfitId}>
+                                  {o.verdict === 'works' ? '✓' : '~'} Outfit ({o.score}%) — {o.items?.map((i: any) => i.name).join(', ') || o.outfitId.slice(0, 8)}
+                                </option>
+                              ))}
+                            </optgroup>
                           </select>
                         </div>
-                      )}
+                      </div>
                       <div className="flex justify-between items-center border-t border-[#d9c1c0]/40 pt-3">
                         <select
                           value={postVisibility}

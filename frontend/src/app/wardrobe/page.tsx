@@ -62,6 +62,7 @@ export default function WardrobePage() {
   const [editFile, setEditFile] = useState<File | null>(null);
   const [editFilePreview, setEditFilePreview] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [loggingWearId, setLoggingWearId] = useState<string | null>(null);
 
   const fetchItems = async () => {
     if (!session?.accessToken) return;
@@ -197,6 +198,7 @@ export default function WardrobePage() {
 
   const handleLogWear = async (id: string, name: string) => {
     if (!session?.accessToken) return;
+    setLoggingWearId(id);
     try {
       await logWear(session.accessToken, id);
       toastSuccess('Wear Logged', `Logged +1 wear for "${name}".`);
@@ -206,6 +208,8 @@ export default function WardrobePage() {
       }
     } catch (err) {
       toastError('Log Wear Failed', err instanceof Error ? err.message : 'Could not log wear.');
+    } finally {
+      setLoggingWearId(null);
     }
   };
 
@@ -426,9 +430,14 @@ export default function WardrobePage() {
                   <div className="flex flex-col gap-2.5 pt-2 border-t border-[#d9c1c0]/50">
                     <button
                       onClick={() => handleLogWear(selected.id, selected.name)}
-                      className="w-full py-3 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all"
+                      disabled={loggingWearId === selected.id}
+                      className="w-full py-3 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                     >
-                      + Log Wear Today
+                      {loggingWearId === selected.id ? (
+                        <><span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Logging Wear...</>
+                      ) : (
+                        '+ Log Wear Today'
+                      )}
                     </button>
                     <button
                       onClick={() => openEditModal(selected)}

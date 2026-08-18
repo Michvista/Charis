@@ -25,7 +25,7 @@ class StyleAdvisorService:
         model_name: str | None = None,
         retriever_model_name: str | None = None,
     ) -> None:
-        self.model_name = model_name or os.getenv("STYLEADVISOR_MODEL", "gemini-1.5-flash")
+        self.model_name = model_name or os.getenv("STYLEADVISOR_MODEL", "gemini-2.5-flash")
         self.retriever_model_name = retriever_model_name or os.getenv(
             "STYLEADVISOR_RETRIEVER_MODEL",
             self.model_name,

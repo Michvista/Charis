@@ -11,13 +11,15 @@ import {
   UserGroupIcon,
   Analytics01Icon,
   SparklesIcon,
-  Settings01Icon
+  Settings01Icon,
+  Shirt01Icon
 } from '@hugeicons/core-free-icons';
 
 const NAV_ITEMS = [
   { id: 'home', icon: Home01Icon, label: 'Home', path: '/' },
   { id: 'wardrobe', icon: Book01Icon, label: 'Library', path: '/wardrobe' },
   { id: 'styling', icon: TShirtIcon, label: 'Styling', path: '/styling' },
+  { id: 'outfits', icon: Shirt01Icon, label: 'Outfits', path: '/outfits' },
   { id: 'trips', icon: Luggage01Icon, label: 'Trips', path: '/trips' },
   { id: 'social', icon: UserGroupIcon, label: 'Lookbook', path: '/social' },
   { id: 'analytics', icon: Analytics01Icon, label: 'Analytics', path: '/analytics' },

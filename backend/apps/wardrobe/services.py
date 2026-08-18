@@ -51,9 +51,43 @@ def upload_image_to_cloudinary(file: Any) -> dict[str, str]:
     }
 
 
-def enqueue_tagging_job(item_id: str) -> None:
-    """Queue stub for AI auto-tagging."""
-    print(f"[QUEUE STUB] Enqueuing auto-tagging job for item ID: {item_id}", flush=True)
+def enqueue_tagging_job(item_id: str, image_url: str = "") -> None:
+    """Push a wardrobe-tagging job onto the BullMQ Redis queue for the job-worker."""
+    import json
+    import uuid
+    import time
+
+    try:
+        import redis as redis_lib
+        redis_url = getattr(settings, "REDIS_URL", "redis://redis:6379")
+        r = redis_lib.from_url(redis_url, decode_responses=True)
+
+        queue_name = "wardrobe-tagging"
+        job_id = str(uuid.uuid4())
+        timestamp = int(time.time() * 1000)
+
+        job_data = {
+            "name": "tag-item",
+            "data": json.dumps({"itemId": item_id, "imageUrl": image_url or ""}),
+            "opts": json.dumps({"attempts": 3, "backoff": {"type": "exponential", "delay": 2000}}),
+            "id": job_id,
+            "timestamp": timestamp,
+            "delay": 0,
+            "priority": 0,
+            "stacktrace": "[]",
+            "returnvalue": "null",
+            "attemptsMade": 0,
+        }
+
+        pipe = r.pipeline()
+        pipe.hmset(f"bull:{queue_name}:{job_id}", job_data)
+        pipe.rpush(f"bull:{queue_name}:wait", job_id)
+        pipe.execute()
+
+        print(f"[QUEUE] Enqueued wardrobe-tagging job {job_id} for item {item_id}", flush=True)
+    except Exception as exc:
+        # Non-critical: tagging will just stay pending if Redis is unavailable
+        print(f"[QUEUE] Failed to enqueue tagging job for item {item_id}: {exc}", flush=True)
 
 
 class StylingServiceUnavailable(Exception):

@@ -18,7 +18,8 @@ export default function TripsPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
-  const [generating, setGenerating] = useState(false);
+  const [generatingNew, setGeneratingNew] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
 
   // Modal States
   const [showTripModal, setShowTripModal] = useState(false);
@@ -110,27 +111,33 @@ export default function TripsPage() {
     }
   };
 
-  async function handleGeneratePacking() {
+  async function handleGeneratePacking(isRecalculate = false) {
     if (!selectedTrip) return;
-    setGenerating(true);
+    if (isRecalculate) setRecalculating(true);
+    else setGeneratingNew(true);
     try {
       if (session?.accessToken) {
-        const list = await generatePackingList(session.accessToken, selectedTrip.id);
+        const raw = await generatePackingList(session.accessToken, selectedTrip.id);
+        // Normalize response — handle wrapped response body
+        const list = (raw as any).body ?? (raw as any).data ?? raw;
         const updatedTrip = { ...selectedTrip, packing_lists: [list] };
-        setTrips((prev) => prev.map((t) => (t.id === selectedTrip.id ? updatedTrip : t)));
         setSelectedTrip(updatedTrip);
+        setTrips((prev) => prev.map((t) => (t.id === selectedTrip.id ? updatedTrip : t)));
         toastSuccess('Packing List Generated', 'Greedy packing algorithm optimized capsule items for all events.');
       }
     } catch (err) {
       toastError('Packing List Failed', err instanceof Error ? err.message : 'Could not generate packing list.');
     } finally {
-      setGenerating(false);
+      if (isRecalculate) setRecalculating(false);
+      else setGeneratingNew(false);
     }
   }
 
   const packingList = selectedTrip?.packing_lists?.[0];
-  const packingItems = packingList?.items ?? [];
-  const coveredPercent = packingItems.length > 0 ? 100 : 0;
+  const packingItems = (packingList?.items ?? (packingList as any)?.body?.items ?? []) as any[];
+  const eventCount = selectedTrip?.trip_events?.length || 0;
+  const coveredEvents = new Set(packingItems.flatMap((pi: any) => pi.covers_event_ids || []));
+  const coveredPercent = eventCount > 0 ? Math.round((coveredEvents.size / eventCount) * 100) : (packingItems.length > 0 ? 100 : 0);
 
   return (
     <AuthGuard>
@@ -230,10 +237,10 @@ export default function TripsPage() {
                         </button>
                         <button
                           className="px-5 py-2.5 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all flex items-center gap-1.5 shadow-md disabled:opacity-50"
-                          onClick={handleGeneratePacking}
-                          disabled={generating}
+                          onClick={() => handleGeneratePacking(false)}
+                          disabled={generatingNew}
                         >
-                          <HugeiconsIcon icon={SparklesIcon} size={14} /> {generating ? 'Optimizing...' : 'Generate Packing List'}
+                          <HugeiconsIcon icon={SparklesIcon} size={14} /> {generatingNew ? 'Optimizing...' : 'Generate Packing List'}
                         </button>
                       </div>
                     </div>
@@ -334,11 +341,11 @@ export default function TripsPage() {
                     </div>
 
                     <button
-                      onClick={handleGeneratePacking}
-                      disabled={generating}
+                      onClick={() => handleGeneratePacking(true)}
+                      disabled={recalculating}
                       className="mt-2 w-full py-3.5 border border-[#d9c1c0] rounded-xl text-xs font-semibold uppercase tracking-wider text-[#1e1b18] hover:border-[#380208] transition-colors disabled:opacity-50"
                     >
-                      {generating ? 'Optimizing...' : 'Re-calculate Capsule'}
+                      {recalculating ? 'Optimizing...' : 'Re-calculate Capsule'}
                     </button>
                   </div>
                 </div>

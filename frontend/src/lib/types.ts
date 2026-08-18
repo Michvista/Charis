@@ -194,11 +194,20 @@ export type StylingCombo = {
   confirmed?: boolean;
 };
 
+export type AiVerdict = {
+  verdict: 'works' | 'doesnt_work' | 'partially_works';
+  confidence: number;
+  visualNotes: string;
+  patternClash: boolean;
+  colourClash: boolean;
+};
+
 export type VerdictResponse = {
   outfitId: string;
   status: 'processing' | 'done' | 'failed';
   score?: number;
   verdictText?: string;
+  aiVerdict?: AiVerdict;
   rankedCombos?: StylingCombo[];
   items?: StylingItem[];
 };

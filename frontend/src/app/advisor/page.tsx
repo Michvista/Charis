@@ -43,7 +43,7 @@ export default function AdvisorPage() {
 
   // "Find this piece" Modal
   const [activeItem, setActiveItem] = useState<StyleAdvisorSuggestion | null>(null);
-  const [addingDraft, setAddingDraft] = useState(false);
+  const [addingDraftId, setAddingDraftId] = useState<string | null>(null);
 
   // Wishlist State with LocalStorage Persistence
   const [wishlist, setWishlist] = useState<StyleAdvisorSuggestion[]>([]);
@@ -126,7 +126,7 @@ export default function AdvisorPage() {
       toastError('Not Authenticated', 'Sign in to add items.');
       return;
     }
-    setAddingDraft(true);
+    setAddingDraftId(item.id);
     try {
       const formData = new FormData();
       formData.append('name', item.item_description.slice(0, 120));
@@ -145,7 +145,7 @@ export default function AdvisorPage() {
     } catch (err) {
       toastError('Draft Failed', err instanceof Error ? err.message : 'Could not add draft to wardrobe.');
     } finally {
-      setAddingDraft(false);
+      setAddingDraftId(null);
     }
   };
 
@@ -344,10 +344,14 @@ export default function AdvisorPage() {
                           <div className="flex items-center gap-2 shrink-0">
                             <button
                               onClick={() => handleAddAsDraft(item)}
-                              disabled={addingDraft}
+                              disabled={addingDraftId === item.id}
                               className="text-xs bg-[#380208] text-white px-2.5 py-1 rounded font-semibold hover:bg-[#54161b] transition-colors flex items-center gap-1 disabled:opacity-50"
                             >
-                              <HugeiconsIcon icon={PlusSignIcon} size={12} /> Draft
+                              {addingDraftId === item.id ? (
+                                <HugeiconsIcon icon={Loading01Icon} size={12} className="animate-spin" />
+                              ) : (
+                                <HugeiconsIcon icon={PlusSignIcon} size={12} />
+                              )} Draft
                             </button>
                             <button
                               onClick={() => { setActiveItem(item); setShowWishlistModal(false); }}
@@ -427,10 +431,10 @@ export default function AdvisorPage() {
                     </p>
                     <button
                       onClick={() => handleAddAsDraft(activeItem)}
-                      disabled={addingDraft}
+                      disabled={addingDraftId === activeItem?.id}
                       className="w-full py-3.5 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
                     >
-                      {addingDraft ? (
+                      {addingDraftId === activeItem?.id ? (
                         <><HugeiconsIcon icon={Loading01Icon} size={14} className="animate-spin" /> Adding Draft...</>
                       ) : (
                         <><HugeiconsIcon icon={PlusSignIcon} size={14} /> + Add to Wardrobe as Draft</>

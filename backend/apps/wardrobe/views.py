@@ -51,18 +51,23 @@ class WardrobeItemViewSet(viewsets.ModelViewSet):
         if not image_url:
             image_url = "https://images.unsplash.com/photo-1544441893-675973e31985?w=600&q=80"
 
-        if not payload.get("primary_color") and extracted_primary_color:
-            payload["primary_color"] = extracted_primary_color
+        # Determine final primary_color: Cloudinary extraction overrides blank user input
+        final_primary_color = payload.get("primary_color") or extracted_primary_color
 
         serializer = self.get_serializer(data=payload)
         serializer.is_valid(raise_exception=True)
 
-        item = serializer.save(
-            user=self.request.user,
-            image_url=image_url,
-        )
+        save_kwargs = {
+            "user": self.request.user,
+            "image_url": image_url,
+        }
+        # Pass primary_color directly into save() so it cannot be lost by QueryDict immutability
+        if final_primary_color:
+            save_kwargs["primary_color"] = final_primary_color
 
-        enqueue_tagging_job(item.id)
+        item = serializer.save(**save_kwargs)
+
+        enqueue_tagging_job(str(item.id), image_url=item.image_url or "")
 
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)

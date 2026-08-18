@@ -19,7 +19,7 @@ import {
   Search01Icon,
   FilterIcon
 } from '@hugeicons/core-free-icons';
-import type { WardrobeItem, Occasion, VerdictResponse } from '@/lib/types';
+import type { WardrobeItem, Occasion, VerdictResponse, AiVerdict } from '@/lib/types';
 
 const SEASON_CHIPS = ['Autumn', 'Winter', 'Spring', 'Summer'];
 const ITEM_CATEGORIES = ['All', 'top', 'bottom', 'outerwear', 'shoes', 'accessory'];
@@ -179,7 +179,8 @@ export default function StylingPage() {
     }
   }
 
-  const score = verdict?.score ?? 0;
+  const aiVerdictData: AiVerdict | null = (verdict as any)?.aiVerdict ?? (verdict as any)?.body?.aiVerdict ?? null;
+  const score = aiVerdictData?.confidence ?? verdict?.score ?? 0;
   const selectedItemsList = wardrobeItems.filter((i) => selectedItems.has(i.id));
 
   // Decluttered Wardrobe List (Search + Category Filtered)
@@ -393,14 +394,57 @@ export default function StylingPage() {
                   </span>
                 </div>
 
-                <div className="flex items-baseline gap-1">
-                  <span className="serif text-6xl font-bold leading-none">{score}</span>
-                  <span className="text-lg opacity-70">% Harmony</span>
+                {/* Score + Verdict Badge */}
+                <div className="flex items-end justify-between gap-3">
+                  <div className="flex items-baseline gap-1">
+                    <span className="serif text-6xl font-bold leading-none">{score}</span>
+                    <span className="text-lg opacity-70">%</span>
+                  </div>
+                  {aiVerdictData?.verdict && (
+                    <span className={`px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${
+                      aiVerdictData.verdict === 'works' ? 'bg-emerald-500/20 text-emerald-300' :
+                      aiVerdictData.verdict === 'partially_works' ? 'bg-amber-500/20 text-amber-300' :
+                      'bg-red-500/20 text-red-300'
+                    }`}>
+                      {aiVerdictData.verdict === 'works' ? '✓ Works' :
+                       aiVerdictData.verdict === 'partially_works' ? '~ Partial' :
+                       '✗ Clashes'}
+                    </span>
+                  )}
                 </div>
 
-                <p className="serif text-xl font-bold leading-snug text-amber-100">
-                  "{verdict?.verdictText || 'Select wardrobe items to analyze outfit composition.'}"
-                </p>
+                {/* Visual Notes */}
+                {aiVerdictData?.visualNotes ? (
+                  <p className="text-sm leading-relaxed text-white/90">
+                    {aiVerdictData.visualNotes}
+                  </p>
+                ) : verdict?.verdictText ? (
+                  <p className="serif text-xl font-bold leading-snug text-amber-100">
+                    "{verdict.verdictText}"
+                  </p>
+                ) : (
+                  <p className="text-sm text-white/60 italic">
+                    Select wardrobe items and run analysis to get AI verdict.
+                  </p>
+                )}
+
+                {/* Clash Indicators */}
+                {aiVerdictData && (
+                  <div className="flex gap-3 flex-wrap">
+                    <div className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${
+                      aiVerdictData.patternClash ? 'bg-red-500/20 text-red-300' : 'bg-white/10 text-white/60'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${aiVerdictData.patternClash ? 'bg-red-400' : 'bg-white/40'}`} />
+                      Pattern Clash
+                    </div>
+                    <div className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${
+                      aiVerdictData.colourClash ? 'bg-red-500/20 text-red-300' : 'bg-white/10 text-white/60'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${aiVerdictData.colourClash ? 'bg-red-400' : 'bg-white/40'}`} />
+                      Colour Clash
+                    </div>
+                  </div>
+                )}
 
                 {verdict?.status === 'processing' && (
                   <div className="flex items-center gap-2 text-xs text-amber-200 animate-pulse">
@@ -419,15 +463,39 @@ export default function StylingPage() {
               </button>
 
               <button
-                className="w-full py-3.5 border border-[#d9c1c0] rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 text-[#1e1b18] bg-white hover:border-[#380208] transition-colors"
-                onClick={() => toastSuccess('Look Saved', 'Ensemble saved to your personal styling archive.')}
+                className="w-full py-3.5 border border-[#d9c1c0] rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 text-[#1e1b18] bg-white hover:border-[#380208] transition-colors disabled:opacity-40"
+                disabled={!verdict?.outfitId || !aiVerdictData}
+                onClick={() => {
+                  if (!verdict?.outfitId) return;
+                  const savedOutfits = JSON.parse(localStorage.getItem('charis.saved_outfits') || '[]');
+                  const already = savedOutfits.some((o: any) => o.outfitId === verdict.outfitId);
+                  if (!already) {
+                    savedOutfits.unshift({
+                      outfitId: verdict.outfitId,
+                      savedAt: new Date().toISOString(),
+                      score,
+                      verdict: aiVerdictData?.verdict || 'unknown',
+                      visualNotes: aiVerdictData?.visualNotes || '',
+                      items: selectedItemsList.map((i) => ({ name: i.name, image_url: i.image_url, category: i.category })),
+                    });
+                    localStorage.setItem('charis.saved_outfits', JSON.stringify(savedOutfits));
+                  }
+                  toastSuccess('Outfit Saved', 'Ensemble saved to your outfits archive. View it in the Outfits page.');
+                }}
               >
                 <HugeiconsIcon icon={FloppyDiskIcon} size={16} /> Save Outfit to Archive
               </button>
 
               <button
-                className="w-full py-3 border border-[#d9c1c0] rounded-xl text-xs font-medium flex items-center justify-center gap-2 text-[#544342] bg-transparent hover:text-[#380208] transition-colors"
-                onClick={() => toastSuccess('Share Link Copied', 'Public outfit lookbook URL copied to clipboard.')}
+                className="w-full py-3 border border-[#d9c1c0] rounded-xl text-xs font-medium flex items-center justify-center gap-2 text-[#544342] bg-transparent hover:text-[#380208] transition-colors disabled:opacity-40"
+                disabled={!verdict?.outfitId}
+                onClick={() => {
+                  if (!verdict?.outfitId) return;
+                  const url = `${window.location.origin}/outfits/${verdict.outfitId}`;
+                  navigator.clipboard.writeText(url).then(() =>
+                    toastSuccess('Share Link Copied', `Public lookbook URL copied: ${url}`)
+                  );
+                }}
               >
                 <HugeiconsIcon icon={Share01Icon} size={14} /> Share Lookbook URL
               </button>

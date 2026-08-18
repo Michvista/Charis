@@ -58,6 +58,9 @@ export default function WardrobePage() {
   const [editFormality, setEditFormality] = useState(3);
   const [editPrice, setEditPrice] = useState('');
   const [editColor, setEditColor] = useState('');
+  const [editImageUrl, setEditImageUrl] = useState('');
+  const [editFile, setEditFile] = useState<File | null>(null);
+  const [editFilePreview, setEditFilePreview] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
 
   const fetchItems = async () => {
@@ -130,6 +133,9 @@ export default function WardrobePage() {
     setEditFormality(item.formality_level || 3);
     setEditPrice(item.purchase_price || '');
     setEditColor(item.primary_color || '');
+    setEditImageUrl(item.image_url || '');
+    setEditFile(null);
+    setEditFilePreview('');
     setShowEditModal(true);
   };
 
@@ -139,19 +145,35 @@ export default function WardrobePage() {
 
     setSavingEdit(true);
     try {
-      const updated = await updateWardrobeItem(session.accessToken, editItem.id, {
-        name: editName.trim(),
-        brand: editBrand.trim() || undefined,
-        category: editCategory,
-        formality_level: Number(editFormality),
-        purchase_price: editPrice || undefined,
-        primary_color: editColor || undefined,
-      });
+      let updated: WardrobeItem;
+      if (editFile) {
+        const formData = new FormData();
+        formData.append('name', editName.trim());
+        if (editBrand.trim()) formData.append('brand', editBrand.trim());
+        formData.append('category', editCategory);
+        formData.append('formality_level', String(editFormality));
+        if (editPrice) formData.append('purchase_price', editPrice);
+        if (editColor) formData.append('primary_color', editColor);
+        formData.append('image', editFile);
+        updated = await updateWardrobeItem(session.accessToken, editItem.id, formData as any);
+      } else {
+        updated = await updateWardrobeItem(session.accessToken, editItem.id, {
+          name: editName.trim(),
+          brand: editBrand.trim() || undefined,
+          category: editCategory,
+          formality_level: Number(editFormality),
+          purchase_price: editPrice || undefined,
+          primary_color: editColor || undefined,
+          ...(editImageUrl !== editItem.image_url ? { image_url: editImageUrl } : {}),
+        });
+      }
       toastSuccess('Item Updated', `"${editName}" has been updated.`);
       setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
       if (selected?.id === updated.id) setSelected(updated);
       setShowEditModal(false);
       setEditItem(null);
+      setEditFile(null);
+      setEditFilePreview('');
     } catch (err) {
       toastError('Update Failed', err instanceof Error ? err.message : 'Could not update item.');
     } finally {
@@ -595,17 +617,36 @@ export default function WardrobePage() {
                   </div>
 
                   <form onSubmit={handleSaveEdit} className="flex flex-col gap-4">
-                    <div className="flex items-center gap-4 pb-3">
-                      <div className="w-20 h-20 rounded-xl overflow-hidden bg-[#f5ece7] shrink-0">
+                    {/* Image Section */}
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-semibold text-[#544342]">Item Image</label>
+                      <div className="relative aspect-[3/4] max-h-48 rounded-xl overflow-hidden bg-[#fbf2ed] border border-[#d9c1c0]">
                         <img
-                          src={editItem.image_url || 'https://images.unsplash.com/photo-1544441893-675973e31985?w=400&q=80'}
-                          alt={editItem.name}
+                          src={editFilePreview || editImageUrl || 'https://images.unsplash.com/photo-1544441893-675973e31985?w=400&q=80'}
+                          alt="Current"
                           className="w-full h-full object-cover"
                         />
+                        <label className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity cursor-pointer">
+                          <HugeiconsIcon icon={Upload01Icon} size={24} className="text-white" />
+                          <span className="text-white text-xs font-semibold mt-1">Change Image</span>
+                          <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) { setEditFile(f); setEditFilePreview(URL.createObjectURL(f)); }
+                          }} />
+                        </label>
                       </div>
-                      <p className="text-xs text-[#867272] leading-relaxed">
-                        To update the image, delete this item and re-add with a new upload. Cloudinary automatically extracts the primary color when you upload an image.
-                      </p>
+                      {!editFile && (
+                        <input
+                          type="text"
+                          value={editImageUrl}
+                          onChange={(e) => setEditImageUrl(e.target.value)}
+                          placeholder="Or paste image URL..."
+                          className="py-2 border-b border-[#d9c1c0] bg-transparent text-xs text-[#1e1b18] outline-none focus:border-[#380208]"
+                        />
+                      )}
+                      {editFile && (
+                        <p className="text-[11px] text-emerald-700 font-medium">✓ New image selected: {editFile.name}</p>
+                      )}
                     </div>
 
                     <div className="flex flex-col gap-1.5">

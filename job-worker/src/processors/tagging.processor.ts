@@ -10,8 +10,8 @@ import { TaggingJobData } from "../queues/tagging.queue";
 
 const TAGGING_PROMPT = `Analyze this clothing item image and return ONLY valid JSON with no markdown:
 {
-  category: one of TOP|BOTTOM|SHOES|OUTERWEAR|ACCESSORY|DRESS|BAG,
-  primary_color: hex string e.g. #FF0000,
+  category: one of TOP|BOTTOM|SHOES|OUTERWEAR|ACCESSORY,
+  primary_color: hex string e.g. #FF0000, //leave this alone
   formality_level: integer 1-5 where 1=very casual 5=black tie,
   season_tags: array containing any of spring|summer|fall|winter,
   fabric: string describing fabric or null
@@ -42,6 +42,12 @@ export function startTaggingWorker(): Worker<TaggingJobData> {
       };
 
       try {
+        if (!imageUrl || !imageUrl.startsWith('http')) {
+          console.warn(`[wardrobe-tagging] skipping job ${job.id} for item ${itemId} — no valid imageUrl`);
+          await patchStatus("failed");
+          return;
+        }
+
         const raw = await callGeminiVision(TAGGING_PROMPT, [imageUrl]);
         const parsed = validateTaggingResult(parseGeminiJson(raw));
 

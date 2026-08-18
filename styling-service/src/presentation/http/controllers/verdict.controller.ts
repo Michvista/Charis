@@ -44,13 +44,16 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
   @Post()
   async evaluateOutfit(@DReq() req: any, @DRes() res: any) {
     const body = (req.body ?? {}) as EvaluateVerdictDTO;
-    const userId = req.payload?.id;
-
+    let userId = req.payload?.id;
     if (!userId) {
       return res.status(401).json({
         status: "fail",
         message: "Unauthorized: missing authenticated user",
       });
+    }
+
+    if (userId === "internal-service") {
+      userId = (req.body && typeof req.body.userId === "string" && req.body.userId) || "00000000-0000-0000-0000-000000000000";
     }
 
     const dto: EvaluateVerdictDTO = {
@@ -74,8 +77,8 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
   async completeOutfit(@DReq() req: any, @DRes() res: any) {
     const id = req.params?.id;
     const body = req.body ?? {};
-    const payloadId = req.payload?.id;
-    if (payloadId !== "internal-service") {
+    const isInternal = req.payload?.isInternal || payloadId === "internal-service";
+    if (!isInternal) {
       return res.status(403).json({
         status: "fail",
         message: "Forbidden: internal route",

@@ -43,7 +43,7 @@ async function bootstrapDatabase() {
 
 async function bootstrap() {
   const port = Number(process.env.PORT || 3300);
-  const dolph = new DolphFactory([OccasionComponent, StylingComponent], port);
+  const dolph = new DolphFactory([OccasionComponent, StylingComponent]);
   dolph.start();
   void bootstrapDatabase();
 }

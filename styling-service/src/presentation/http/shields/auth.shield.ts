@@ -28,7 +28,11 @@ export const authShield = (req: DRequest, res: DResponse, next: DNextFunc) => {
   }
 
   if (INTERNAL_API_KEY && token === INTERNAL_API_KEY) {
-    (req as any).payload = { id: (req.body && typeof req.body.userId === "string" && req.body.userId) || "00000000-0000-0000-0000-000000000000" };
+    const bodyUserId = req.body && typeof req.body.userId === "string" ? req.body.userId : undefined;
+    (req as any).payload = {
+      id: bodyUserId || "internal-service",
+      isInternal: true,
+    };
     return next();
   }
 

@@ -27,14 +27,16 @@ export class CombosController extends DolphControllerHandler<Dolph> {
 
   @Post()
   async generateCombos(@DReq() req: any, @DRes() res: any) {
-    const body = (req.body ?? {}) as GenerateCombosDTO;
-    const userId = req.payload?.id;
-
+    let userId = req.payload?.id;
     if (!userId) {
       return res.status(401).json({
         status: 'fail',
         message: 'Unauthorized: missing authenticated user',
       });
+    }
+
+    if (userId === "internal-service") {
+      userId = (req.body && typeof req.body.userId === "string" && req.body.userId) || "00000000-0000-0000-0000-000000000000";
     }
 
     const dto: GenerateCombosDTO = {
@@ -59,7 +61,8 @@ export class CombosController extends DolphControllerHandler<Dolph> {
       });
     }
 
-    if (userId !== "internal-service") {
+    const isInternal = req.payload?.isInternal || userId === "internal-service";
+    if (!isInternal) {
       return res.status(403).json({
         status: "fail",
         message: "Forbidden: internal route",

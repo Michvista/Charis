@@ -7,7 +7,8 @@ import { useAuth } from '@/lib/context/AuthContext';
 import { useToast } from '@/lib/context/ToastContext';
 import { listTrips, createTrip, createTripEvent, generatePackingList } from '@/api/tripplanner.api';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, MapPin, Plus, Sparkles, X, Luggage, CheckCircle2, Package } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Calendar01Icon, Location01Icon, PlusSignIcon, SparklesIcon, Cancel01Icon, Luggage01Icon, CheckmarkCircle02Icon, PackageIcon } from '@hugeicons/core-free-icons';
 import type { Trip } from '@/lib/types';
 
 export default function TripsPage() {
@@ -152,7 +153,7 @@ export default function TripsPage() {
               onClick={() => setShowTripModal(true)}
               className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#380208] text-white text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20"
             >
-              <Plus size={16} /> Plan New Trip
+              <HugeiconsIcon icon={PlusSignIcon} size={16} /> Plan New Trip
             </button>
           </div>
 
@@ -163,14 +164,14 @@ export default function TripsPage() {
             </div>
           ) : trips.length === 0 ? (
             <div className="py-12 bg-white/60 border border-dashed border-[#d9c1c0] rounded-2xl flex flex-col items-center justify-center text-center p-8">
-              <Luggage size={36} className="text-[#d9c1c0] mb-3" />
+              <HugeiconsIcon icon={Luggage01Icon} size={36} className="text-[#d9c1c0] mb-3" />
               <p className="serif text-xl font-semibold text-[#1e1b18]">No trips planned yet</p>
               <p className="text-xs text-[#544342] mt-1 mb-4">Plan your first editorial travel capsule.</p>
               <button
                 onClick={() => setShowTripModal(true)}
                 className="px-5 py-2.5 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] flex items-center gap-1.5"
               >
-                <Plus size={14} /> Plan New Trip
+                <HugeiconsIcon icon={PlusSignIcon} size={14} /> Plan New Trip
               </button>
             </div>
           ) : (
@@ -190,7 +191,7 @@ export default function TripsPage() {
                       <span className={`eyebrow ${selectedTrip?.id === t.id ? 'text-amber-200' : 'text-[#867272]'}`}>
                         {t.destination}
                       </span>
-                      <Luggage size={14} className={selectedTrip?.id === t.id ? 'text-white' : 'text-[#380208]'} />
+                      <HugeiconsIcon icon={Luggage01Icon} size={14} className={selectedTrip?.id === t.id ? 'text-white' : 'text-[#380208]'} />
                     </div>
                     <p className="serif text-lg font-bold truncate">{t.name}</p>
                     <p className={`text-[11px] ${selectedTrip?.id === t.id ? 'text-white/80' : 'text-[#867272]'}`}>
@@ -210,11 +211,11 @@ export default function TripsPage() {
                         <h2 className="serif text-3xl font-bold text-[#1e1b18] mt-1">{selectedTrip.name}</h2>
                         <div className="flex gap-6 mt-2 text-xs text-[#544342]">
                           <div className="flex items-center gap-1.5 font-medium">
-                            <Calendar size={14} className="text-[#380208]" />
+                            <HugeiconsIcon icon={Calendar01Icon} size={14} className="text-[#380208]" />
                             <span>{selectedTrip.start_date} to {selectedTrip.end_date}</span>
                           </div>
                           <div className="flex items-center gap-1.5 font-medium">
-                            <MapPin size={14} className="text-[#380208]" />
+                            <HugeiconsIcon icon={Location01Icon} size={14} className="text-[#380208]" />
                             <span>{selectedTrip.destination}</span>
                           </div>
                         </div>
@@ -232,7 +233,7 @@ export default function TripsPage() {
                           onClick={handleGeneratePacking}
                           disabled={generating}
                         >
-                          <Sparkles size={14} /> {generating ? 'Optimizing...' : 'Generate Packing List'}
+                          <HugeiconsIcon icon={SparklesIcon} size={14} /> {generating ? 'Optimizing...' : 'Generate Packing List'}
                         </button>
                       </div>
                     </div>
@@ -244,7 +245,7 @@ export default function TripsPage() {
 
                     {(selectedTrip.trip_events?.length ?? 0) === 0 ? (
                       <div className="py-10 text-center bg-white/60 border border-dashed border-[#d9c1c0] rounded-2xl">
-                        <Calendar size={32} className="text-[#d9c1c0] mx-auto mb-2" />
+                        <HugeiconsIcon icon={Calendar01Icon} size={32} className="text-[#d9c1c0] mx-auto mb-2" />
                         <p className="text-xs text-[#867272]">No events yet. Add itinerary events with formality levels so the AI can pack the right items.</p>
                       </div>
                     ) : (
@@ -268,7 +269,7 @@ export default function TripsPage() {
 
                                 {assignedItem ? (
                                   <div className="flex items-center gap-4 p-3.5 bg-[#fbf2ed] rounded-xl border border-[#d9c1c0]/40">
-                                    <CheckCircle2 size={18} className="text-emerald-700 shrink-0" />
+                                    <HugeiconsIcon icon={CheckmarkCircle02Icon} size={18} className="text-emerald-700 shrink-0" />
                                     <div>
                                       <span className="eyebrow text-[10px]">Assigned Capsule Piece</span>
                                       <p className="serif text-sm font-semibold text-[#1e1b18] mt-0.5">{assignedItem.wardrobe_item_name}</p>
@@ -277,7 +278,7 @@ export default function TripsPage() {
                                   </div>
                                 ) : (
                                   <div className="flex items-center gap-3 p-3 bg-[#fbf2ed] rounded-xl border border-dashed border-[#d9c1c0]/40 text-xs text-[#867272]">
-                                    <Package size={14} className="text-[#d9c1c0]" />
+                                    <HugeiconsIcon icon={PackageIcon} size={14} className="text-[#d9c1c0]" />
                                     Generate packing list to assign capsule pieces
                                   </div>
                                 )}
@@ -293,7 +294,7 @@ export default function TripsPage() {
                   <div className="bg-white rounded-2xl p-6 border border-[#d9c1c0] shadow-md flex flex-col gap-5 sticky top-6">
                     <div className="flex justify-between items-center border-b border-[#d9c1c0]/50 pb-3">
                       <h3 className="serif text-xl font-bold text-[#1e1b18]">Packing Capsule</h3>
-                      <Luggage size={20} className="text-[#380208]" />
+                      <HugeiconsIcon icon={Luggage01Icon} size={20} className="text-[#380208]" />
                     </div>
 
                     <div className="flex justify-between items-center text-xs">
@@ -315,14 +316,14 @@ export default function TripsPage() {
                     <div className="flex flex-col gap-3 max-h-80 overflow-y-auto pr-1">
                       {packingItems.length === 0 ? (
                         <div className="py-8 flex flex-col items-center text-center gap-2">
-                          <Package size={28} className="text-[#d9c1c0]" />
+                          <HugeiconsIcon icon={PackageIcon} size={28} className="text-[#d9c1c0]" />
                           <p className="text-xs text-[#867272]">No packing list generated yet.</p>
                           <p className="text-[11px] text-[#544342]">Add events with formality levels, then generate a packing list.</p>
                         </div>
                       ) : (
                         packingItems.map((pi) => (
                           <div key={pi.id} className="flex items-center gap-3 p-2.5 bg-[#fbf2ed] rounded-xl border border-[#d9c1c0]/40">
-                            <CheckCircle2 size={16} className="text-emerald-700 shrink-0" />
+                            <HugeiconsIcon icon={CheckmarkCircle02Icon} size={16} className="text-emerald-700 shrink-0" />
                             <div className="min-w-0 flex-1">
                               <p className="serif text-xs font-bold text-[#1e1b18] truncate">{pi.wardrobe_item_name}</p>
                               <p className="text-[10px] text-[#867272] uppercase tracking-wider">{pi.wardrobe_item_category}</p>
@@ -360,7 +361,7 @@ export default function TripsPage() {
                       <span className="eyebrow">Trip Planner</span>
                       <h2 className="serif text-2xl font-bold text-[#1e1b18]">Plan New Trip</h2>
                     </div>
-                    <button onClick={() => setShowTripModal(false)} className="text-[#867272] hover:text-[#380208]"><X size={20} /></button>
+                    <button onClick={() => setShowTripModal(false)} className="text-[#867272] hover:text-[#380208]"><HugeiconsIcon icon={Cancel01Icon} size={20} /></button>
                   </div>
 
                   <form onSubmit={handleCreateTrip} className="flex flex-col gap-4">
@@ -410,7 +411,7 @@ export default function TripsPage() {
                       <span className="eyebrow">Trip: {selectedTrip?.name}</span>
                       <h2 className="serif text-2xl font-bold text-[#1e1b18]">Add Itinerary Event</h2>
                     </div>
-                    <button onClick={() => setShowEventModal(false)} className="text-[#867272] hover:text-[#380208]"><X size={20} /></button>
+                    <button onClick={() => setShowEventModal(false)} className="text-[#867272] hover:text-[#380208]"><HugeiconsIcon icon={Cancel01Icon} size={20} /></button>
                   </div>
 
                   <form onSubmit={handleCreateEvent} className="flex flex-col gap-4">

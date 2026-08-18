@@ -1,6 +1,6 @@
 # Charis Styling Service API
 
-Base URL in Docker: `http://localhost:3000`
+Base URL in Docker: `http://localhost:3300`
 
 The styling-service is protected by a DolphJS auth shield. It accepts either:
 

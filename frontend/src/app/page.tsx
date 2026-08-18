@@ -3,7 +3,18 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowRight, Thermometer, RefreshCw, Sparkles, BookMarked, Shirt, Users, BarChart2, Plus } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  ArrowRight01Icon,
+  ThermometerIcon,
+  RefreshIcon,
+  SparklesIcon,
+  Book01Icon,
+  TShirtIcon,
+  UserGroupIcon,
+  Analytics01Icon,
+  PlusSignIcon
+} from '@hugeicons/core-free-icons';
 import { useAuth } from '@/lib/context/AuthContext';
 import { requestBackend } from '@/api/client';
 import type { WardrobeItem } from '@/lib/types';
@@ -121,16 +132,16 @@ export default function HomePage() {
 
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#544342]">
           <button onClick={() => router.push('/wardrobe')} className="hover:text-[#380208] transition-colors flex items-center gap-1.5">
-            <BookMarked size={16} /> Library
+            <HugeiconsIcon icon={Book01Icon} size={16} /> Library
           </button>
           <button onClick={() => router.push('/styling')} className="hover:text-[#380208] transition-colors flex items-center gap-1.5">
-            <Shirt size={16} /> Styling
+            <HugeiconsIcon icon={TShirtIcon} size={16} /> Styling
           </button>
           <button onClick={() => router.push('/social')} className="hover:text-[#380208] transition-colors flex items-center gap-1.5">
-            <Users size={16} /> Lookbook
+            <HugeiconsIcon icon={UserGroupIcon} size={16} /> Lookbook
           </button>
           <button onClick={() => router.push('/analytics')} className="hover:text-[#380208] transition-colors flex items-center gap-1.5">
-            <BarChart2 size={16} /> Intelligence
+            <HugeiconsIcon icon={Analytics01Icon} size={16} /> Intelligence
           </button>
         </nav>
 
@@ -202,7 +213,7 @@ export default function HomePage() {
             >
               <div className="flex justify-between items-center">
                 <span className="eyebrow flex items-center gap-1.5 text-[#380208]">
-                  <Sparkles size={12} className="text-[#380208]" /> Today's Suggestion
+                  <HugeiconsIcon icon={SparklesIcon} size={12} className="text-[#380208]" /> Today's Suggestion
                 </span>
                 <button
                   onClick={fetchWeatherSuggestion}
@@ -210,13 +221,13 @@ export default function HomePage() {
                   title="Refresh Local Weather Suggestion"
                   className="text-[#867272] hover:text-[#380208] transition-colors p-1"
                 >
-                  <RefreshCw size={12} className={loadingSuggestion ? 'animate-spin' : ''} />
+                  <HugeiconsIcon icon={RefreshIcon} size={12} className={loadingSuggestion ? 'animate-spin' : ''} />
                 </button>
               </div>
               <p className="serif text-xl font-semibold text-[#1e1b18] leading-snug">{suggestion.title}</p>
               {suggestion.detail && <p className="text-xs text-[#544342] leading-normal">{suggestion.detail}</p>}
               <div className="flex items-center gap-2 text-xs font-medium text-[#380208] bg-[#fbf2ed] px-2.5 py-1.5 rounded-md w-fit mt-1">
-                <Thermometer size={14} />
+                <HugeiconsIcon icon={ThermometerIcon} size={14} />
                 <span>{suggestion.temp} · Local Climate</span>
               </div>
             </motion.div>
@@ -234,7 +245,7 @@ export default function HomePage() {
               className="flex items-center gap-2 text-sm font-semibold text-[#380208] hover:gap-3 transition-all"
               onClick={() => router.push('/wardrobe')}
             >
-              View Full Collection <ArrowRight size={16} />
+              View Full Collection <HugeiconsIcon icon={ArrowRight01Icon} size={16} />
             </button>
           </div>
 
@@ -250,7 +261,7 @@ export default function HomePage() {
                 onClick={() => router.push('/wardrobe')}
                 className="px-5 py-2.5 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] flex items-center gap-1.5 shadow-md"
               >
-                <Plus size={14} /> Add Garment
+                <HugeiconsIcon icon={PlusSignIcon} size={14} /> Add Garment
               </button>
             </div>
           ) : (

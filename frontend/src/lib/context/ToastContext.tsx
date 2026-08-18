@@ -2,7 +2,8 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { CheckmarkCircle02Icon, AlertCircleIcon, InformationCircleIcon, Cancel01Icon } from '@hugeicons/core-free-icons';
 
 export type ToastType = 'success' | 'error' | 'info';
 
@@ -56,9 +57,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   : 'bg-white/95 border-[#d9c1c0] text-[#1e1b18]'
               }`}
             >
-              {t.type === 'success' && <CheckCircle2 size={18} className="text-emerald-600 shrink-0 mt-0.5" />}
-              {t.type === 'error' && <AlertCircle size={18} className="text-red-600 shrink-0 mt-0.5" />}
-              {t.type === 'info' && <Info size={18} className="text-[#380208] shrink-0 mt-0.5" />}
+              {t.type === 'success' && <HugeiconsIcon icon={CheckmarkCircle02Icon} size={18} className="text-emerald-600 shrink-0 mt-0.5" />}
+              {t.type === 'error' && <HugeiconsIcon icon={AlertCircleIcon} size={18} className="text-red-600 shrink-0 mt-0.5" />}
+              {t.type === 'info' && <HugeiconsIcon icon={InformationCircleIcon} size={18} className="text-[#380208] shrink-0 mt-0.5" />}
 
               <div className="flex-1 min-w-0">
                 <h4 className="text-xs font-bold uppercase tracking-wider font-sans">{t.title}</h4>
@@ -69,7 +70,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 onClick={() => removeToast(t.id)}
                 className="text-[#867272] hover:text-[#1e1b18] p-0.5 rounded transition-colors"
               >
-                <X size={14} />
+                <HugeiconsIcon icon={Cancel01Icon} size={14} />
               </button>
             </motion.div>
           ))}

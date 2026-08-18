@@ -3,11 +3,16 @@ import type { Occasion, StylingItem, StyleAdvisorSuggestion, VerdictResponse } f
 
 export async function listOccasions(token: string): Promise<Occasion[]> {
   try {
-    const res = await requestStyling<Occasion[]>('/occasions', {
+    const raw = await requestStyling<any[]>('/occasions', {
       method: 'GET',
       token,
     });
-    return Array.isArray(res) ? res : [];
+    if (!Array.isArray(raw)) return [];
+    return raw.map((item: any) => ({
+      id: String(item.id || item._id || item.props?.id || ''),
+      name: String(item.name || item.props?.name || 'Unnamed Occasion'),
+      formalityLevel: Number(item.formalityLevel ?? item.props?.formalityLevel ?? 1),
+    }));
   } catch (err) {
     console.warn('Styling occasions API fetch error:', err);
     return [];
@@ -15,11 +20,16 @@ export async function listOccasions(token: string): Promise<Occasion[]> {
 }
 
 export async function createOccasion(token: string, data: { name: string; formalityLevel: number }): Promise<Occasion> {
-  return requestStyling<Occasion>('/occasions', {
+  const raw = await requestStyling<any>('/occasions', {
     method: 'POST',
     token,
     body: data,
   });
+  return {
+    id: String(raw.id || raw._id || raw.props?.id || ''),
+    name: String(raw.name || raw.props?.name || data.name),
+    formalityLevel: Number(raw.formalityLevel ?? raw.props?.formalityLevel ?? data.formalityLevel),
+  };
 }
 
 export async function generateCombos(token: string, data: { occasionId?: string; targetSeason?: string; items: StylingItem[] }): Promise<{ outfitId: string; status: string }> {

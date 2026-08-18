@@ -9,10 +9,11 @@ import { completeStyleAdvisor } from '@/api/styling.api';
 import { listWardrobeItems, createWardrobeItem } from '@/api/wardrobe.api';
 import { listOccasions } from '@/api/styling.api';
 import { motion, AnimatePresence } from 'framer-motion';
+import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  Sparkles, RefreshCw, ArrowRight, X, ExternalLink, ShoppingBag,
-  Plus, BookmarkCheck, Loader2, CheckCircle2, Info
-} from 'lucide-react';
+  SparklesIcon, RefreshIcon, ArrowRight01Icon, Cancel01Icon, Link01Icon, ShoppingBag01Icon,
+  PlusSignIcon, Bookmark01Icon, Loading01Icon, CheckmarkCircle02Icon, InformationCircleIcon
+} from '@hugeicons/core-free-icons';
 import type { StyleAdvisorSuggestion, WardrobeItem, Occasion } from '@/lib/types';
 
 const PRIORITY_COLOR: Record<string, string> = {
@@ -179,7 +180,7 @@ export default function AdvisorPage() {
                 onClick={() => setShowWishlistModal(true)}
                 className="flex items-center gap-2 px-4 py-3 border border-[#d9c1c0] text-[#1e1b18] rounded-lg text-xs font-semibold uppercase tracking-wider bg-white hover:border-[#380208] transition-colors"
               >
-                <BookmarkCheck size={16} className="text-[#380208]" /> View Wishlist ({wishlist.length})
+                <HugeiconsIcon icon={Bookmark01Icon} size={16} className="text-[#380208]" /> View Wishlist ({wishlist.length})
               </button>
 
               <button
@@ -187,7 +188,7 @@ export default function AdvisorPage() {
                 onClick={handleRefresh}
                 disabled={loading || loadingContext}
               >
-                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                <HugeiconsIcon icon={RefreshIcon} size={14} className={loading ? 'animate-spin' : ''} />
                 {loading ? 'Consulting Advisor...' : 'Refresh AI Suggestions'}
               </button>
             </div>
@@ -195,7 +196,7 @@ export default function AdvisorPage() {
 
           {/* Context Info Banner */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-4 bg-white rounded-2xl border border-[#d9c1c0] shadow-sm">
-            <Info size={18} className="text-[#380208] shrink-0 mt-0.5" />
+            <HugeiconsIcon icon={InformationCircleIcon} size={18} className="text-[#380208] shrink-0 mt-0.5" />
             <div className="flex-1 text-xs text-[#544342]">
               <span className="font-semibold text-[#1e1b18]">Wardrobe-Grounded RAG: </span>
               The advisor reads your{' '}
@@ -210,7 +211,7 @@ export default function AdvisorPage() {
 
           {/* Occasion Prompt Box */}
           <div className="flex items-center gap-3 p-4 bg-white rounded-2xl border border-[#d9c1c0] shadow-sm">
-            <Sparkles size={20} className="text-[#380208] shrink-0" />
+            <HugeiconsIcon icon={SparklesIcon} size={20} className="text-[#380208] shrink-0" />
             <input
               className="flex-1 border-none outline-none text-sm text-[#1e1b18] bg-transparent font-medium placeholder:text-[#867272]"
               value={occasion}
@@ -222,14 +223,14 @@ export default function AdvisorPage() {
               disabled={loading}
               className="px-4 py-2 bg-[#fbf2ed] text-[#380208] rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#380208] hover:text-white transition-all disabled:opacity-50"
             >
-              {loading ? <Loader2 size={14} className="animate-spin" /> : 'Ask AI →'}
+              {loading ? <HugeiconsIcon icon={Loading01Icon} size={14} className="animate-spin" /> : 'Ask AI →'}
             </button>
           </div>
 
           {/* Empty / Loading State */}
           {suggestions.length === 0 && !loading && (
             <div className="py-12 text-center bg-white/60 border border-dashed border-[#d9c1c0] rounded-2xl flex flex-col items-center gap-3">
-              <Sparkles size={36} className="text-[#d9c1c0]" />
+              <HugeiconsIcon icon={SparklesIcon} size={36} className="text-[#d9c1c0]" />
               <p className="serif text-xl font-semibold text-[#1e1b18]">No recommendations yet</p>
               <p className="text-xs text-[#544342] max-w-sm">
                 Describe your occasion above and click "Refresh AI Suggestions" to get wardrobe-grounded style recommendations.
@@ -282,7 +283,7 @@ export default function AdvisorPage() {
                         onClick={() => setActiveItem(s)}
                         className="flex items-center gap-1.5 text-xs font-semibold text-[#380208] hover:gap-2.5 transition-all"
                       >
-                        Find this piece <ArrowRight size={14} />
+                        Find this piece <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
                       </button>
 
                       <button
@@ -294,9 +295,9 @@ export default function AdvisorPage() {
                         }`}
                       >
                         {inWishlist ? (
-                          <><BookmarkCheck size={14} /> ✓ Saved</>
+                          <><HugeiconsIcon icon={Bookmark01Icon} size={14} /> ✓ Saved</>
                         ) : (
-                          <><Plus size={14} /> + Wishlist</>
+                          <><HugeiconsIcon icon={PlusSignIcon} size={14} /> + Wishlist</>
                         )}
                       </button>
                     </div>
@@ -322,13 +323,13 @@ export default function AdvisorPage() {
                       <h2 className="serif text-2xl font-bold text-[#1e1b18]">Sartorial Wishlist</h2>
                     </div>
                     <button onClick={() => setShowWishlistModal(false)} className="text-[#867272] hover:text-[#380208]">
-                      <X size={20} />
+                      <HugeiconsIcon icon={Cancel01Icon} size={20} />
                     </button>
                   </div>
 
                   {wishlist.length === 0 ? (
                     <div className="py-12 text-center text-xs text-[#867272] flex flex-col items-center gap-2">
-                      <BookmarkCheck size={32} className="text-[#d9c1c0]" />
+                      <HugeiconsIcon icon={Bookmark01Icon} size={32} className="text-[#d9c1c0]" />
                       <p>Your wishlist is currently empty.</p>
                       <p className="text-[11px] text-[#544342]">Click "+ Wishlist" on any suggestion to save items here.</p>
                     </div>
@@ -346,7 +347,7 @@ export default function AdvisorPage() {
                               disabled={addingDraft}
                               className="text-xs bg-[#380208] text-white px-2.5 py-1 rounded font-semibold hover:bg-[#54161b] transition-colors flex items-center gap-1 disabled:opacity-50"
                             >
-                              <Plus size={12} /> Draft
+                              <HugeiconsIcon icon={PlusSignIcon} size={12} /> Draft
                             </button>
                             <button
                               onClick={() => { setActiveItem(item); setShowWishlistModal(false); }}
@@ -393,7 +394,7 @@ export default function AdvisorPage() {
                       <h2 className="serif text-xl font-bold text-[#1e1b18] leading-tight">{activeItem.item_description}</h2>
                     </div>
                     <button onClick={() => setActiveItem(null)} className="text-[#867272] hover:text-[#380208] shrink-0 ml-2">
-                      <X size={20} />
+                      <HugeiconsIcon icon={Cancel01Icon} size={20} />
                     </button>
                   </div>
 
@@ -411,10 +412,10 @@ export default function AdvisorPage() {
                         className="flex justify-between items-center p-3.5 bg-[#fbf2ed] hover:bg-[#380208] hover:text-white rounded-xl border border-[#d9c1c0]/40 transition-colors group"
                       >
                         <div className="flex items-center gap-2">
-                          <ShoppingBag size={16} className="text-[#380208] group-hover:text-white" />
+                          <HugeiconsIcon icon={ShoppingBag01Icon} size={16} className="text-[#380208] group-hover:text-white" />
                           <span className="text-xs font-bold tracking-wider">{store.name}</span>
                         </div>
-                        <ExternalLink size={14} className="opacity-60 group-hover:opacity-100" />
+                        <HugeiconsIcon icon={Link01Icon} size={14} className="opacity-60 group-hover:opacity-100" />
                       </a>
                     ))}
                   </div>
@@ -430,9 +431,9 @@ export default function AdvisorPage() {
                       className="w-full py-3.5 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       {addingDraft ? (
-                        <><Loader2 size={14} className="animate-spin" /> Adding Draft...</>
+                        <><HugeiconsIcon icon={Loading01Icon} size={14} className="animate-spin" /> Adding Draft...</>
                       ) : (
-                        <><Plus size={14} /> + Add to Wardrobe as Draft</>
+                        <><HugeiconsIcon icon={PlusSignIcon} size={14} /> + Add to Wardrobe as Draft</>
                       )}
                     </button>
                   </div>

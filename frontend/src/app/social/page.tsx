@@ -8,7 +8,8 @@ import { useToast } from '@/lib/context/ToastContext';
 import { listSocialFeed, createOutfitShare, addComment, voteShare, createFriendship, listFriendships } from '@/api/social.api';
 import { fetchProfile } from '@/api/auth.api';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, MessageSquare, Bookmark, Plus, Send, UserPlus, Search, X, Loader2 } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { FavouriteIcon, Comment01Icon, Bookmark01Icon, PlusSignIcon, SentIcon, UserAdd01Icon, Search01Icon, Cancel01Icon, Loading01Icon } from '@hugeicons/core-free-icons';
 import type { OutfitShare, UserProfile } from '@/lib/types';
 
 export default function SocialPage() {
@@ -332,7 +333,7 @@ export default function SocialPage() {
                                   : 'text-[#380208] hover:underline'
                               }`}
                             >
-                              <UserPlus size={14} />
+                              <HugeiconsIcon icon={UserAdd01Icon} size={14} />
                               {requestedFriends.has(share.user || '') ? 'Requested' : 'Connect'}
                             </button>
                           )}
@@ -351,9 +352,9 @@ export default function SocialPage() {
                               }`}
                             >
                               {isVoting ? (
-                                <Loader2 size={15} className="animate-spin" />
+                                <HugeiconsIcon icon={Loading01Icon} size={15} className="animate-spin" />
                               ) : (
-                                <Heart size={16} className={isLiked ? 'fill-red-600 text-red-600' : ''} />
+                                <HugeiconsIcon icon={FavouriteIcon} size={16} className={isLiked ? 'fill-red-600 text-red-600' : ''} />
                               )}
                               <span>{(share.vote_breakdown?.upvotes || 0)} Likes</span>
                             </button>
@@ -361,7 +362,7 @@ export default function SocialPage() {
                               onClick={() => setOpenComments((prev) => ({ ...prev, [share.id]: !prev[share.id] }))}
                               className="flex items-center gap-1.5 text-xs font-semibold text-[#544342] hover:text-[#380208] transition-colors"
                             >
-                              <MessageSquare size={16} />
+                              <HugeiconsIcon icon={Comment01Icon} size={16} />
                               <span>{share.comment_count ?? 0} Reflections</span>
                             </button>
                           </div>
@@ -369,7 +370,7 @@ export default function SocialPage() {
                             onClick={() => toastSuccess('Bookmarked', 'Added to saved lookbook inspiration.')}
                             className="text-[#867272] hover:text-[#380208]"
                           >
-                            <Bookmark size={16} />
+                            <HugeiconsIcon icon={Bookmark01Icon} size={16} />
                           </button>
                         </div>
 
@@ -397,9 +398,9 @@ export default function SocialPage() {
                                 className="px-4 py-2 bg-[#380208] text-white rounded-lg text-xs font-semibold flex items-center gap-1 disabled:opacity-50"
                               >
                                 {submittingComment[share.id] ? (
-                                  <Loader2 size={12} className="animate-spin" />
+                                  <HugeiconsIcon icon={Loading01Icon} size={12} className="animate-spin" />
                                 ) : (
-                                  <Send size={12} />
+                                  <HugeiconsIcon icon={SentIcon} size={12} />
                                 )}
                                 Post
                               </button>
@@ -485,7 +486,7 @@ export default function SocialPage() {
               <div className="bg-white rounded-2xl p-6 border border-[#d9c1c0] shadow-sm flex flex-col gap-4">
                 <h3 className="serif text-xl font-bold text-[#1e1b18]">Discover Community Posts & People</h3>
                 <div className="relative">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#867272]" />
+                  <HugeiconsIcon icon={Search01Icon} size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#867272]" />
                   <input
                     type="text"
                     placeholder="Search posts, captions, or community members..."
@@ -495,7 +496,7 @@ export default function SocialPage() {
                   />
                   {profileSearch && (
                     <button onClick={() => setProfileSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#867272] hover:text-[#380208]">
-                      <X size={14} />
+                      <HugeiconsIcon icon={Cancel01Icon} size={14} />
                     </button>
                   )}
                 </div>
@@ -517,7 +518,7 @@ export default function SocialPage() {
                               onClick={() => handleSendFriendRequest(s.user || '', s.user_email || '')}
                               className="px-3 py-1 rounded-full border border-[#d9c1c0] text-[11px] font-semibold hover:border-[#380208] hover:bg-[#380208] hover:text-white transition-all shrink-0"
                             >
-                              <UserPlus size={12} />
+                              <HugeiconsIcon icon={UserAdd01Icon} size={12} />
                             </button>
                           )}
                         </div>
@@ -537,8 +538,8 @@ export default function SocialPage() {
                         <div key={s.id} className="flex items-start justify-between gap-3 p-3 bg-[#fbf2ed] rounded-xl border border-[#d9c1c0]/40">
                           <p className="text-xs text-[#1e1b18] line-clamp-2">{s.caption}</p>
                           <div className="flex items-center gap-2 text-[10px] text-[#867272] shrink-0">
-                            <Heart size={10} className="text-red-400" /> {s.vote_breakdown?.upvotes || 0}
-                            <MessageSquare size={10} /> {s.comment_count || 0}
+                            <HugeiconsIcon icon={FavouriteIcon} size={10} className="text-red-400" /> {s.vote_breakdown?.upvotes || 0}
+                            <HugeiconsIcon icon={Comment01Icon} size={10} /> {s.comment_count || 0}
                           </div>
                         </div>
                       ))

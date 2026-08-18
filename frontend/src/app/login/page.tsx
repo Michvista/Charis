@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
 import { login, register } from '@/api/auth.api';
-import { Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ViewIcon, ViewOffIcon, AlertCircleIcon, CheckmarkCircle02Icon } from '@hugeicons/core-free-icons';
 
 export default function LoginPage() {
   const [tab, setTab] = useState<'signin' | 'register'>('signin');
@@ -121,7 +122,7 @@ export default function LoginPage() {
                 />
                 {!isUsernameValid && username.length > 0 && (
                   <span className="text-[11px] text-red-600 flex items-center gap-1">
-                    <AlertCircle size={12} /> Username must be at least 3 characters
+                    <HugeiconsIcon icon={AlertCircleIcon} size={12} /> Username must be at least 3 characters
                   </span>
                 )}
               </div>
@@ -140,7 +141,7 @@ export default function LoginPage() {
               />
               {!isEmailValid && email.length > 0 && (
                 <span className="text-[11px] text-red-600 flex items-center gap-1">
-                  <AlertCircle size={12} /> Enter a valid email address
+                  <HugeiconsIcon icon={AlertCircleIcon} size={12} /> Enter a valid email address
                 </span>
               )}
             </div>
@@ -169,12 +170,12 @@ export default function LoginPage() {
                   className="absolute right-0 top-1/2 -translate-y-1/2 text-[#867272] hover:text-[#380208]"
                   onClick={() => setShowPassword(p => !p)}
                 >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPassword ? <HugeiconsIcon icon={ViewOffIcon} size={16} /> : <HugeiconsIcon icon={ViewIcon} size={16} />}
                 </button>
               </div>
               {!isPasswordValid && password.length > 0 && (
                 <span className="text-[11px] text-red-600 flex items-center gap-1">
-                  <AlertCircle size={12} /> Password must be at least 8 characters
+                  <HugeiconsIcon icon={AlertCircleIcon} size={12} /> Password must be at least 8 characters
                 </span>
               )}
             </div>
@@ -197,17 +198,17 @@ export default function LoginPage() {
                     className="absolute right-0 top-1/2 -translate-y-1/2 text-[#867272] hover:text-[#380208]"
                     onClick={() => setShowPasswordConfirm(p => !p)}
                   >
-                    {showPasswordConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {showPasswordConfirm ? <HugeiconsIcon icon={ViewOffIcon} size={16} /> : <HugeiconsIcon icon={ViewIcon} size={16} />}
                   </button>
                 </div>
                 {!isPasswordMatch && passwordConfirm.length > 0 && (
                   <span className="text-[11px] text-red-600 flex items-center gap-1">
-                    <AlertCircle size={12} /> Passwords do not match
+                    <HugeiconsIcon icon={AlertCircleIcon} size={12} /> Passwords do not match
                   </span>
                 )}
                 {isPasswordMatch && passwordConfirm.length >= 8 && (
                   <span className="text-[11px] text-emerald-700 flex items-center gap-1">
-                    <CheckCircle2 size={12} /> Passwords match
+                    <HugeiconsIcon icon={CheckmarkCircle02Icon} size={12} /> Passwords match
                   </span>
                 )}
               </div>
@@ -216,7 +217,7 @@ export default function LoginPage() {
             {/* Server Error Alert */}
             {serverError && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs flex items-start gap-2">
-                <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                <HugeiconsIcon icon={AlertCircleIcon} size={14} className="shrink-0 mt-0.5" />
                 <span>{serverError}</span>
               </div>
             )}

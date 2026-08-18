@@ -7,7 +7,8 @@ import { useAuth } from '@/lib/context/AuthContext';
 import { useToast } from '@/lib/context/ToastContext';
 import { fetchProfile, updateProfile } from '@/api/auth.api';
 import { motion } from 'framer-motion';
-import { User, Mail, Shield, LogOut, Save, Camera, Sparkles } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { UserIcon, Mail01Icon, Shield01Icon, Logout01Icon, FloppyDiskIcon, Camera01Icon, SparklesIcon } from '@hugeicons/core-free-icons';
 import { useRouter } from 'next/navigation';
 
 export default function SettingsPage() {
@@ -84,7 +85,7 @@ export default function SettingsPage() {
               onClick={handleLogout}
               className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-red-200 text-red-700 bg-white hover:bg-red-50 text-xs font-semibold uppercase tracking-wider transition-colors shrink-0 shadow-sm"
             >
-              <LogOut size={16} /> Log Out
+              <HugeiconsIcon icon={Logout01Icon} size={16} /> Log Out
             </button>
           </div>
 
@@ -99,7 +100,7 @@ export default function SettingsPage() {
                   username?.[0]?.toUpperCase() || 'C'
                 )}
                 <div className="absolute inset-0 bg-black/20 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
-                  <Camera size={20} className="text-white" />
+                  <HugeiconsIcon icon={Camera01Icon} size={20} className="text-white" />
                 </div>
               </div>
 
@@ -107,7 +108,7 @@ export default function SettingsPage() {
                 <h2 className="serif text-2xl font-bold text-[#1e1b18]">{username || 'Curator'}</h2>
                 <p className="text-xs text-[#867272] mt-0.5">{session?.user?.email}</p>
                 <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold text-[#380208] bg-[#fbf2ed] px-2.5 py-0.5 rounded-full mt-2 border border-[#d9c1c0]/40">
-                  <Shield size={12} /> Authenticated User
+                  <HugeiconsIcon icon={Shield01Icon} size={12} /> Authenticated User
                 </span>
               </div>
             </div>
@@ -116,7 +117,7 @@ export default function SettingsPage() {
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-[#544342] flex items-center gap-1.5">
-                  <User size={14} className="text-[#380208]" /> Username / Editorial Handle
+                  <HugeiconsIcon icon={UserIcon} size={14} className="text-[#380208]" /> Username / Editorial Handle
                 </label>
                 <input
                   type="text"
@@ -130,7 +131,7 @@ export default function SettingsPage() {
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-[#544342] flex items-center gap-1.5">
-                  <Mail size={14} className="text-[#380208]" /> Email Address (Read-only)
+                  <HugeiconsIcon icon={Mail01Icon} size={14} className="text-[#380208]" /> Email Address (Read-only)
                 </label>
                 <input
                   type="email"
@@ -170,7 +171,7 @@ export default function SettingsPage() {
                 disabled={saving}
                 className="px-6 py-3 bg-[#380208] text-white rounded-xl text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20 flex items-center gap-2 disabled:opacity-50"
               >
-                <Save size={16} /> {saving ? 'Saving...' : 'Save Profile Changes'}
+                <HugeiconsIcon icon={FloppyDiskIcon} size={16} /> {saving ? 'Saving...' : 'Save Profile Changes'}
               </button>
             </div>
           </form>

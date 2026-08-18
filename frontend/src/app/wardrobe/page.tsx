@@ -7,7 +7,8 @@ import { useAuth } from '@/lib/context/AuthContext';
 import { useToast } from '@/lib/context/ToastContext';
 import { listWardrobeItems, createWardrobeItem, deleteWardrobeItem, logWear, updateWardrobeItem } from '@/api/wardrobe.api';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Trash2, Shirt, Upload, Edit2, Save } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { PlusSignIcon, Cancel01Icon, Delete02Icon, TShirtIcon, Upload01Icon, PencilEdit01Icon, FloppyDiskIcon } from '@hugeicons/core-free-icons';
 import type { WardrobeItem } from '@/lib/types';
 
 function WearDots({ count }: { count: number }) {
@@ -230,7 +231,7 @@ export default function WardrobePage() {
                 onClick={() => setShowAddModal(true)}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#380208] text-white text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20"
               >
-                <Plus size={16} /> Add Item
+                <HugeiconsIcon icon={PlusSignIcon} size={16} /> Add Item
               </button>
             </div>
           </div>
@@ -262,7 +263,7 @@ export default function WardrobePage() {
               ) : filteredItems.length === 0 ? (
                 <div className="col-span-full py-20 bg-white/60 border border-dashed border-[#d9c1c0] rounded-2xl flex flex-col items-center justify-center text-center p-8">
                   <div className="w-16 h-16 rounded-full bg-[#fbf2ed] text-[#380208] grid place-items-center mb-4">
-                    <Shirt size={28} />
+                    <HugeiconsIcon icon={TShirtIcon} size={28} />
                   </div>
                   <h3 className="serif text-2xl font-semibold text-[#1e1b18]">Your library is empty</h3>
                   <p className="text-xs text-[#544342] max-w-sm mt-1 mb-6">
@@ -305,7 +306,7 @@ export default function WardrobePage() {
                         className="absolute top-3 left-3 w-7 h-7 bg-white/90 rounded-full grid place-items-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-[#380208] hover:text-white text-[#380208]"
                         title="Edit Item"
                       >
-                        <Edit2 size={12} />
+                        <HugeiconsIcon icon={PencilEdit01Icon} size={12} />
                       </button>
                     </div>
 
@@ -346,7 +347,7 @@ export default function WardrobePage() {
                   <div className="flex justify-between items-center border-b border-[#d9c1c0]/50 pb-3">
                     <h2 className="serif text-xl font-bold text-[#1e1b18]">Item Specification</h2>
                     <button onClick={() => setSelected(null)} className="text-[#867272] hover:text-[#380208]">
-                      <X size={18} />
+                      <HugeiconsIcon icon={Cancel01Icon} size={18} />
                     </button>
                   </div>
 
@@ -411,13 +412,13 @@ export default function WardrobePage() {
                       onClick={() => openEditModal(selected)}
                       className="w-full py-2.5 border border-[#d9c1c0] text-[#1e1b18] hover:border-[#380208] rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
                     >
-                      <Edit2 size={14} /> Edit Item Details
+                      <HugeiconsIcon icon={PencilEdit01Icon} size={14} /> Edit Item Details
                     </button>
                     <button
                       onClick={() => handleDeleteItem(selected.id, selected.name)}
                       className="w-full py-2.5 border border-red-200 text-red-700 hover:bg-red-50 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
                     >
-                      <Trash2 size={14} /> Remove Item
+                      <HugeiconsIcon icon={Delete02Icon} size={14} /> Remove Item
                     </button>
                   </div>
                 </motion.div>
@@ -441,7 +442,7 @@ export default function WardrobePage() {
                       <h2 className="serif text-2xl font-bold text-[#1e1b18]">Curate New Item</h2>
                     </div>
                     <button onClick={() => setShowAddModal(false)} className="text-[#867272] hover:text-[#380208]">
-                      <X size={20} />
+                      <HugeiconsIcon icon={Cancel01Icon} size={20} />
                     </button>
                   </div>
 
@@ -465,7 +466,7 @@ export default function WardrobePage() {
                           </div>
                         ) : (
                           <div className="flex flex-col items-center gap-1.5 py-3 text-[#544342]">
-                            <Upload size={24} className="text-[#380208]" />
+                            <HugeiconsIcon icon={Upload01Icon} size={24} className="text-[#380208]" />
                             <p className="text-xs font-semibold text-[#1e1b18]">Click or drag image file from your system</p>
                             <p className="text-[10px] text-[#867272]">PNG, JPG, WEBP — Cloudinary will extract primary color</p>
                           </div>
@@ -589,7 +590,7 @@ export default function WardrobePage() {
                       <h2 className="serif text-2xl font-bold text-[#1e1b18]">Update Details</h2>
                     </div>
                     <button onClick={() => setShowEditModal(false)} className="text-[#867272] hover:text-[#380208]">
-                      <X size={20} />
+                      <HugeiconsIcon icon={Cancel01Icon} size={20} />
                     </button>
                   </div>
 
@@ -684,7 +685,7 @@ export default function WardrobePage() {
                       disabled={savingEdit}
                       className="w-full py-3.5 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20 disabled:opacity-50 mt-2 flex items-center justify-center gap-2"
                     >
-                      <Save size={14} /> {savingEdit ? 'Saving...' : 'Save Changes →'}
+                      <HugeiconsIcon icon={FloppyDiskIcon} size={14} /> {savingEdit ? 'Saving...' : 'Save Changes →'}
                     </button>
                   </form>
                 </motion.div>

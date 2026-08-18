@@ -1,18 +1,28 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
-import { Shirt, Luggage, Users, BarChart2, Sparkles, BookMarked, Home, Settings } from 'lucide-react';
 import { useAuth } from '@/lib/context/AuthContext';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  Home01Icon,
+  Book01Icon,
+  TShirtIcon,
+  Luggage01Icon,
+  UserGroupIcon,
+  Analytics01Icon,
+  SparklesIcon,
+  Settings01Icon
+} from '@hugeicons/core-free-icons';
 
 const NAV_ITEMS = [
-  { id: 'home', icon: Home, label: 'Home', path: '/' },
-  { id: 'wardrobe', icon: BookMarked, label: 'Library', path: '/wardrobe' },
-  { id: 'styling', icon: Shirt, label: 'Styling', path: '/styling' },
-  { id: 'trips', icon: Luggage, label: 'Trips', path: '/trips' },
-  { id: 'social', icon: Users, label: 'Lookbook', path: '/social' },
-  { id: 'analytics', icon: BarChart2, label: 'Analytics', path: '/analytics' },
-  { id: 'advisor', icon: Sparkles, label: 'Advisor', path: '/advisor' },
-  { id: 'settings', icon: Settings, label: 'Settings', path: '/settings' },
+  { id: 'home', icon: Home01Icon, label: 'Home', path: '/' },
+  { id: 'wardrobe', icon: Book01Icon, label: 'Library', path: '/wardrobe' },
+  { id: 'styling', icon: TShirtIcon, label: 'Styling', path: '/styling' },
+  { id: 'trips', icon: Luggage01Icon, label: 'Trips', path: '/trips' },
+  { id: 'social', icon: UserGroupIcon, label: 'Lookbook', path: '/social' },
+  { id: 'analytics', icon: Analytics01Icon, label: 'Analytics', path: '/analytics' },
+  { id: 'advisor', icon: SparklesIcon, label: 'Advisor', path: '/advisor' },
+  { id: 'settings', icon: Settings01Icon, label: 'Settings', path: '/settings' },
 ];
 
 export function Sidebar() {
@@ -42,7 +52,7 @@ export function Sidebar() {
         </button>
 
         <nav className="flex flex-col gap-1 flex-1 mt-2 w-full px-2">
-          {NAV_ITEMS.map(({ id, icon: Icon, label, path }) => {
+          {NAV_ITEMS.map(({ id, icon, label, path }) => {
             const isActive = pathname === path || (path !== '/' && pathname.startsWith(path));
             return (
               <button
@@ -55,7 +65,7 @@ export function Sidebar() {
                 onClick={() => router.push(path)}
                 title={label}
               >
-                <Icon size={20} strokeWidth={1.5} />
+                <HugeiconsIcon icon={icon} size={20} />
               </button>
             );
           })}
@@ -74,7 +84,7 @@ export function Sidebar() {
 
       {/* Mobile Bottom Navigation Bar (< md) */}
       <nav className="flex md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#fff8f5]/95 border-t border-[#d9c1c0] z-50 justify-around items-center px-2 backdrop-blur-xl">
-        {NAV_ITEMS.map(({ id, icon: Icon, label, path }) => {
+        {NAV_ITEMS.map(({ id, icon, label, path }) => {
           const isActive = pathname === path || (path !== '/' && pathname.startsWith(path));
           return (
             <button
@@ -84,7 +94,7 @@ export function Sidebar() {
               }`}
               onClick={() => router.push(path)}
             >
-              <Icon size={18} strokeWidth={isActive ? 2 : 1.5} />
+              <HugeiconsIcon icon={icon} size={18} />
               <span className="mt-0.5">{label}</span>
             </button>
           );

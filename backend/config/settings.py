@@ -83,15 +83,31 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 #   Database                             
+raw_db_url = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
+
+# Strip 'uselibpqcompat' query parameter before dj_database_url parses it
+if "uselibpqcompat" in raw_db_url:
+    # Handle cases where it's the only parameter (?uselibpqcompat=true) or chained (&uselibpqcompat=true)
+    import re
+    raw_db_url = re.sub(r'[?&]uselibpqcompat=[^&]*', '', raw_db_url)
+    # If stripping leaves a trailing '?', remove it
+    if raw_db_url.endswith('?'):
+        raw_db_url = raw_db_url[:-1]
 
 DATABASES = {
     "default": dj_database_url.config(
-        default=os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'db.sqlite3'}"),
+        default=raw_db_url,
         conn_max_age=600,
-        ssl_require=False if os.getenv("DATABASE_URL", "").startswith("sqlite") else True,
+        ssl_require=False if raw_db_url.startswith("sqlite") else True,
     )
 }
+
+# Extra safeguard: remove it from OPTIONS if it survived parsing
+if "OPTIONS" in DATABASES["default"]:
+    DATABASES["default"]["OPTIONS"].pop("uselibpqcompat", None)
+
 DJANGO_DB_SCHEMA = os.getenv("DJANGO_DB_SCHEMA", "django")
+
 
 #   Authentication & DRF                       
 

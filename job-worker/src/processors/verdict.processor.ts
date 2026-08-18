@@ -9,7 +9,7 @@ import { sendJson } from "../shared/http";
 import { VerdictJobData } from "../queues/verdict.queue";
 
 const getStylingServiceBaseUrl = (): string =>
-  process.env.STYLING_SERVICE_INTERNAL_URL || "http://localhost:3000";
+  process.env.STYLING_SERVICE_INTERNAL_URL || process.env.STYLING_SERVICE_URL || "http://charis_styling:3300";
 
 const getVerdictCompleteUrl = (outfitId: string): string =>
   `${getStylingServiceBaseUrl()}/verdict/${outfitId}/complete`;

@@ -62,7 +62,7 @@ class StylingServiceUnavailable(Exception):
 
 class StylingServiceClient:
     """HTTP Client responsible for making cross-service calls to DolphJS Styling Service."""
-    BASE_URL = getattr(settings, "STYLING_SERVICE_URL", "http://styling-service:3300")
+    BASE_URL = getattr(settings, "STYLING_SERVICE_URL", "http://localhost:3300")
     INTERNAL_TOKEN = getattr(settings, "STYLING_SERVICE_INTERNAL_TOKEN", "")
 
     @classmethod

@@ -8,7 +8,17 @@ import { useToast } from '@/lib/context/ToastContext';
 import { listWardrobeItems } from '@/api/wardrobe.api';
 import { listOccasions, createOccasion, generateCombos, requestVerdict, fetchVerdict } from '@/api/styling.api';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Save, Share2, ChevronDown, Plus, X, Search, Filter } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  SparklesIcon,
+  FloppyDiskIcon,
+  Share01Icon,
+  ArrowDown01Icon,
+  PlusSignIcon,
+  Cancel01Icon,
+  Search01Icon,
+  FilterIcon
+} from '@hugeicons/core-free-icons';
 import type { WardrobeItem, Occasion, VerdictResponse } from '@/lib/types';
 
 const SEASON_CHIPS = ['Autumn', 'Winter', 'Spring', 'Summer'];
@@ -205,7 +215,7 @@ export default function StylingPage() {
               onClick={() => setShowOccasionModal(true)}
               className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-[#d9c1c0] text-xs font-semibold uppercase tracking-wider text-[#1e1b18] bg-white hover:border-[#380208] transition-colors"
             >
-              <Plus size={14} /> Create Occasion
+              <HugeiconsIcon icon={PlusSignIcon} size={14} /> Create Occasion
             </button>
           </div>
 
@@ -223,17 +233,22 @@ export default function StylingPage() {
                       style={{ color: '#1e1b18', backgroundColor: '#ffffff' }}
                     >
                       <option value="" style={{ color: '#1e1b18', backgroundColor: '#ffffff' }}>Default Occasion</option>
-                      {occasions.map((o, idx) => (
-                        <option
-                          key={o.id || `occ-opt-${idx}`}
-                          value={o.id}
-                          style={{ color: '#1e1b18', backgroundColor: '#ffffff' }}
-                        >
-                          {o.name} (Level {o.formalityLevel}/5)
-                        </option>
-                      ))}
+                      {occasions.map((o: any, idx: number) => {
+                        const occId = o.id || o._id || o.props?.id || `occ-opt-${idx}`;
+                        const occName = o.name || o.props?.name || 'Unnamed Occasion';
+                        const occLevel = o.formalityLevel ?? o.props?.formalityLevel ?? 1;
+                        return (
+                          <option
+                            key={occId}
+                            value={occId}
+                            style={{ color: '#1e1b18', backgroundColor: '#ffffff' }}
+                          >
+                            {occName} (Level {occLevel}/5)
+                          </option>
+                        );
+                      })}
                     </select>
-                    <ChevronDown size={16} className="absolute right-3 pointer-events-none text-[#544342]" />
+                    <HugeiconsIcon icon={ArrowDown01Icon} size={16} className="absolute right-3 pointer-events-none text-[#544342]" />
                   </div>
                 </div>
 
@@ -283,7 +298,7 @@ export default function StylingPage() {
                           onClick={() => toggleItem(item.id)}
                           className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
                         >
-                          <X size={10} />
+                          <HugeiconsIcon icon={Cancel01Icon} size={10} />
                         </button>
                       </motion.div>
                     ))}
@@ -302,7 +317,7 @@ export default function StylingPage() {
                   </div>
 
                   <div className="relative flex-1 max-w-xs">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#867272]" />
+                    <HugeiconsIcon icon={Search01Icon} size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#867272]" />
                     <input
                       type="text"
                       placeholder="Search items..."
@@ -370,7 +385,7 @@ export default function StylingPage() {
               <div className="bg-[#380208] text-white rounded-2xl p-6 flex flex-col gap-5 shadow-xl">
                 <div className="flex justify-between items-center border-b border-white/10 pb-3">
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-white/80">
-                    <Sparkles size={14} className="text-amber-300" />
+                    <HugeiconsIcon icon={SparklesIcon} size={14} className="text-amber-300" />
                     <span>AI Advisor Verdict</span>
                   </div>
                   <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider capitalize">
@@ -400,21 +415,21 @@ export default function StylingPage() {
                 onClick={handleGenerateCombos}
                 disabled={loading}
               >
-                <Sparkles size={16} /> {loading ? 'Evaluating AI Verdict...' : 'Run AI Verdict Analysis'}
+                <HugeiconsIcon icon={SparklesIcon} size={16} /> {loading ? 'Evaluating AI Verdict...' : 'Run AI Verdict Analysis'}
               </button>
 
               <button
                 className="w-full py-3.5 border border-[#d9c1c0] rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 text-[#1e1b18] bg-white hover:border-[#380208] transition-colors"
                 onClick={() => toastSuccess('Look Saved', 'Ensemble saved to your personal styling archive.')}
               >
-                <Save size={16} /> Save Outfit to Archive
+                <HugeiconsIcon icon={FloppyDiskIcon} size={16} /> Save Outfit to Archive
               </button>
 
               <button
                 className="w-full py-3 border border-[#d9c1c0] rounded-xl text-xs font-medium flex items-center justify-center gap-2 text-[#544342] bg-transparent hover:text-[#380208] transition-colors"
                 onClick={() => toastSuccess('Share Link Copied', 'Public outfit lookbook URL copied to clipboard.')}
               >
-                <Share2 size={14} /> Share Lookbook URL
+                <HugeiconsIcon icon={Share01Icon} size={14} /> Share Lookbook URL
               </button>
             </div>
           </div>
@@ -435,7 +450,7 @@ export default function StylingPage() {
                       <h2 className="serif text-2xl font-bold text-[#1e1b18]">New Occasion</h2>
                     </div>
                     <button onClick={() => setShowOccasionModal(false)} className="text-[#867272] hover:text-[#380208]">
-                      <X size={20} />
+                      <HugeiconsIcon icon={Cancel01Icon} size={20} />
                     </button>
                   </div>
 

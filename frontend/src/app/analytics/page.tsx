@@ -7,7 +7,8 @@ import { useAuth } from '@/lib/context/AuthContext';
 import { fetchAnalyticsOverview } from '@/api/analytics.api';
 import { listWardrobeItems } from '@/api/wardrobe.api';
 import { motion } from 'framer-motion';
-import { TrendingUp, Landmark, PieChart } from 'lucide-react';
+import { TrendingUp, BankIcon, PieChart01Icon, Analytics01Icon } from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
 import {
   BarChart,
   Bar,
@@ -109,14 +110,14 @@ export default function AnalyticsPage() {
             <div className="bg-white rounded-2xl p-6 border border-[#d9c1c0] shadow-sm flex flex-col justify-between gap-4">
               <div className="flex justify-between items-center border-b border-[#d9c1c0]/40 pb-3">
                 <span className="eyebrow">Collection Valuation</span>
-                <Landmark size={20} className="text-[#380208]" />
+                <HugeiconsIcon icon={BankIcon} size={20} className="text-[#380208]" />
               </div>
               <div>
                 <p className="serif text-5xl font-bold text-[#1e1b18] leading-none">
                   ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 0 })}
                 </p>
                 <p className="text-xs text-[#544342] flex items-center gap-1 mt-3">
-                  <TrendingUp size={14} className="text-emerald-700" />
+                  <HugeiconsIcon icon={TrendingUp} size={14} className="text-emerald-700" />
                   <span className="font-semibold text-emerald-800">Based on {wardrobeItems.length} garments</span>
                 </p>
               </div>
@@ -153,7 +154,7 @@ export default function AnalyticsPage() {
             <div className="bg-white rounded-2xl p-6 border border-[#d9c1c0] shadow-sm flex flex-col gap-4">
               <div className="flex justify-between items-center border-b border-[#d9c1c0]/40 pb-3">
                 <span className="eyebrow">Category Distribution</span>
-                <PieChart size={18} className="text-[#380208]" />
+                <HugeiconsIcon icon={PieChart01Icon} size={18} className="text-[#380208]" />
               </div>
 
               {!mounted ? (
@@ -209,7 +210,7 @@ export default function AnalyticsPage() {
                 </div>
               ) : !hasAnyWear ? (
                 <div className="h-72 flex flex-col items-center justify-center text-center gap-2">
-                  <BarChart size={36} className="text-[#d9c1c0]" />
+                  <HugeiconsIcon icon={Analytics01Icon} size={36} className="text-[#d9c1c0]" />
                   <p className="text-xs text-[#867272] italic">No wear logs yet. Log a wear in your Library to see trends here.</p>
                 </div>
               ) : (

@@ -22,7 +22,7 @@ import {
 import type { WardrobeItem, Occasion, VerdictResponse, AiVerdict } from '@/lib/types';
 
 const SEASON_CHIPS = ['Autumn', 'Winter', 'Spring', 'Summer'];
-const ITEM_CATEGORIES = ['All', 'top', 'bottom', 'outerwear', 'shoes', 'accessory'];
+const ITEM_CATEGORIES = ['All', 'top', 'bottom', 'outerwear', 'shoes', 'accessory', 'dress', 'bag'];
 
 export default function StylingPage() {
   const { session } = useAuth();
@@ -52,7 +52,14 @@ export default function StylingPage() {
     try {
       const itemsPayload = wardrobeItems
         .filter((i) => selectedItems.has(i.id))
-        .map((i) => ({ wardrobeItemId: i.id, itemRole: i.category, imageUrl: i.image_url }));
+        .map((i) => ({
+          wardrobeItemId: i.id,
+          itemRole: i.category,
+          imageUrl: i.image_url,
+          colorHex: i.primary_color,
+          formalityLevel: i.formality_level,
+          seasonTags: (i.seasons || []).map((season) => season.name),
+        }));
 
       if (session?.accessToken) {
         const res = await generateCombos(session.accessToken, {
@@ -164,7 +171,14 @@ export default function StylingPage() {
     try {
       const itemsPayload = wardrobeItems
         .filter((i) => selectedItems.has(i.id))
-        .map((i) => ({ wardrobeItemId: i.id, itemRole: i.category, imageUrl: i.image_url }));
+        .map((i) => ({
+          wardrobeItemId: i.id,
+          itemRole: i.category,
+          imageUrl: i.image_url,
+          colorHex: i.primary_color,
+          formalityLevel: i.formality_level,
+          seasonTags: (i.seasons || []).map((season) => season.name),
+        }));
 
       if (session?.accessToken) {
         // Step 1: Submit verdict request -> returns { outfitId, status: "pending" }

@@ -24,7 +24,7 @@ function WearDots({ count }: { count: number }) {
   );
 }
 
-const CATEGORIES = ['All', 'top', 'bottom', 'outerwear', 'shoes', 'accessory'];
+const CATEGORIES = ['All', 'top', 'bottom', 'outerwear', 'shoes', 'accessory', 'dress', 'bag'];
 
 export default function WardrobePage() {
   const { session } = useAuth();

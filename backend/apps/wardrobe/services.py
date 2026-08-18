@@ -36,9 +36,9 @@ def _extract_primary_color(response: dict[str, Any]) -> str | None:
     return None
 
 
-def upload_image_to_cloudinary(file: Any) -> dict[str, str]:
-    """Upload a file object to Cloudinary and return the hosted URL plus dominant color."""
-    response = cloudinary.uploader.upload(file, folder="charis/wardrobe", colors=True)
+def upload_image_to_cloudinary(source: Any) -> dict[str, str]:
+    """Upload an image file or URL to Cloudinary and return the hosted URL plus dominant color."""
+    response = cloudinary.uploader.upload(source, folder="charis/wardrobe", colors=True)
     secure_url = response.get("secure_url")
     if not secure_url:
         raise ValueError("Cloudinary upload did not return a secure_url")
@@ -49,6 +49,19 @@ def upload_image_to_cloudinary(file: Any) -> dict[str, str]:
         "secure_url": secure_url,
         "primary_color": primary_color,
     }
+
+
+def normalize_image_source_to_cloudinary(source: Any) -> dict[str, str]:
+    """
+    Normalize a wardrobe image source to a Cloudinary-hosted asset whenever possible.
+
+    This helps avoid blocked hotlink URLs reaching downstream vision workers.
+    """
+    return upload_image_to_cloudinary(source)
+
+
+def is_cloudinary_url(source: str) -> bool:
+    return "res.cloudinary.com" in source
 
 
 def enqueue_tagging_job(item_id: str, image_url: str = "") -> None:
@@ -69,7 +82,9 @@ def enqueue_tagging_job(item_id: str, image_url: str = "") -> None:
         job_data = {
             "name": "tag-item",
             "data": json.dumps({"itemId": item_id, "imageUrl": image_url or ""}),
-            "opts": json.dumps({"attempts": 3, "backoff": {"type": "exponential", "delay": 2000}}),
+            # Keep tagging to a single attempt so a permanent failure does not
+            # spam Redis/BullMQ retries or duplicate Gemini calls.
+            "opts": json.dumps({"attempts": 1}),
             "id": job_id,
             "timestamp": timestamp,
             "delay": 0,

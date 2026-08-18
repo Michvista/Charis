@@ -31,7 +31,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='friendship',
-            constraint=models.CheckConstraint(condition=models.Q(('requester', models.F('addressee')), _negated=True), name='social_friendship_not_self_referential'),
+            constraint=models.CheckConstraint(check=models.Q(('requester', models.F('addressee')), _negated=True), name='social_friendship_not_self_referential'),
         ),
         migrations.AddConstraint(
             model_name='friendship',

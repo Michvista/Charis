@@ -77,6 +77,7 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
   async completeOutfit(@DReq() req: any, @DRes() res: any) {
     const id = req.params?.id;
     const body = req.body ?? {};
+    const payloadId = req.payload?.id;
     const isInternal = req.payload?.isInternal || payloadId === "internal-service";
     if (!isInternal) {
       return res.status(403).json({

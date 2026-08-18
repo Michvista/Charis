@@ -1,4 +1,5 @@
 from django.test import TestCase
+from django.core.management import call_command
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from apps.wardrobe.models import WardrobeItem, Season, WearLog
@@ -8,6 +9,7 @@ from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 from unittest.mock import patch
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 
 User = get_user_model()
 
@@ -155,6 +157,7 @@ class WardrobeUploadTests(TestCase):
             {
                 "name": "Cloud Tee",
                 "category": "top",
+                "primary_color": "black",
                 "formality_level": 2,
                 "image": image,
             },
@@ -167,3 +170,106 @@ class WardrobeUploadTests(TestCase):
         self.assertEqual(item.primary_color, "#445566")
         self.assertEqual(item.image_url, "https://res.cloudinary.com/demo/image/upload/v1/tee.jpg")
         mock_enqueue.assert_called_once()
+
+    @patch("apps.wardrobe.views.enqueue_tagging_job")
+    @patch("apps.wardrobe.views.upload_image_to_cloudinary")
+    def test_cloudinary_extracted_color_overrides_placeholder_input(self, mock_upload, mock_enqueue):
+        mock_upload.return_value = {
+            "secure_url": "https://res.cloudinary.com/demo/image/upload/v1/coat.jpg",
+            "primary_color": "#112233",
+        }
+
+        image = SimpleUploadedFile(
+            "coat.jpg",
+            b"fake-image-bytes",
+            content_type="image/jpeg",
+        )
+
+        response = self.client.post(
+            "/api/wardrobe/items/",
+            {
+                "name": "Cloud Coat",
+                "category": "outerwear",
+                "primary_color": "black",
+                "formality_level": 4,
+                "image": image,
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        item = WardrobeItem.objects.get()
+        self.assertEqual(item.primary_color, "#112233")
+        mock_enqueue.assert_called_once()
+
+    @override_settings(STYLING_SERVICE_INTERNAL_TOKEN="test-internal-token")
+    def test_internal_service_token_allows_wardrobe_update_without_jwt(self):
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer test-internal-token")
+
+        item = WardrobeItem.objects.create(
+            user=self.user,
+            name="Internal Auth Tee",
+            category="top",
+            primary_color="black",
+            image_url="https://example.com/internal-tee.jpg",
+        )
+
+        response = self.client.patch(
+            f"/api/wardrobe/items/{item.pk}/",
+            {
+                "tagging_status": "done",
+                "primary_color": "#abcdef",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        item.refresh_from_db()
+        self.assertEqual(item.tagging_status, "done")
+        self.assertEqual(item.primary_color, "#abcdef")
+
+
+class WardrobeBackfillCommandTests(TestCase):
+    @patch("apps.wardrobe.management.commands.backfill_wardrobe_assets.enqueue_tagging_job")
+    @patch("apps.wardrobe.management.commands.backfill_wardrobe_assets.normalize_image_source_to_cloudinary")
+    def test_backfill_rehosts_external_urls_and_requeues_tagging(self, mock_rehost, mock_enqueue):
+        mock_rehost.return_value = {
+            "secure_url": "https://res.cloudinary.com/demo/image/upload/v1/backfilled.jpg",
+            "primary_color": "#123456",
+        }
+
+        owner = User.objects.create_user(
+            username="backfill-owner",
+            email="backfill@example.com",
+            password="Password123!",
+        )
+        external_item = WardrobeItem.objects.create(
+            user=owner,
+            name="External Coat",
+            category="outerwear",
+            primary_color="black",
+            image_url="https://example.com/coat.jpg",
+            tagging_status="failed",
+        )
+        cloudinary_item = WardrobeItem.objects.create(
+            user=owner,
+            name="Cloud Tee",
+            category="top",
+            primary_color="#abcdef",
+            image_url="https://res.cloudinary.com/demo/image/upload/v1/tee.jpg",
+            tagging_status="done",
+        )
+
+        call_command("backfill_wardrobe_assets")
+
+        external_item.refresh_from_db()
+        cloudinary_item.refresh_from_db()
+
+        self.assertEqual(external_item.image_url, "https://res.cloudinary.com/demo/image/upload/v1/backfilled.jpg")
+        self.assertEqual(external_item.primary_color, "#123456")
+        self.assertEqual(external_item.tagging_status, "pending")
+
+        self.assertEqual(cloudinary_item.image_url, "https://res.cloudinary.com/demo/image/upload/v1/tee.jpg")
+        self.assertEqual(cloudinary_item.tagging_status, "pending")
+        mock_rehost.assert_called_once_with("https://example.com/coat.jpg")
+        self.assertEqual(mock_enqueue.call_count, 2)

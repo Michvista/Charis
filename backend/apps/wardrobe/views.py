@@ -1,3 +1,4 @@
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -9,12 +10,15 @@ from django.db import transaction
 import uuid
 
 from common.permissions import IsOwner
+from common.authentication import InternalServiceAuthentication
 from common.pagination import StandardResultsSetPagination
 
 from .models import WardrobeItem, WearLog
 from .serializers import WardrobeItemSerializer, WearLogSerializer
 from .services import (
     upload_image_to_cloudinary,
+    normalize_image_source_to_cloudinary,
+    is_cloudinary_url,
     enqueue_tagging_job,
     StylingServiceClient,
     StylingServiceUnavailable,
@@ -27,19 +31,13 @@ from apps.wardrobe.models import WardrobeItem, Season, WearLog
 class WardrobeItemViewSet(viewsets.ModelViewSet):
     serializer_class = WardrobeItemSerializer
     pagination_class = StandardResultsSetPagination
+    authentication_classes = [InternalServiceAuthentication, JWTAuthentication]
     
     # Enable file upload parsing alongside standard JSON
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def _is_internal_request(self):
-        auth_header = self.request.headers.get("Authorization", "")
-        internal_key = os.getenv("INTERNAL_API_KEY", "")
-        if internal_key and (f"Bearer {internal_key}" in auth_header or auth_header == internal_key):
-            return True
-        # Fallback: check if header or token matches internal bearer format
-        if "Bearer internal" in auth_header or "Bearer " in auth_header:
-            return True
-        return False
+        return bool(getattr(self.request.user, "is_internal_service", False))
 
     def get_permissions(self):
         if self._is_internal_request():
@@ -55,9 +53,32 @@ class WardrobeItemViewSet(viewsets.ModelViewSet):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         data = request.data.copy()
+        image_file = self.request.FILES.get('image')
+        image_url = data.get("image_url", instance.image_url)
+        extracted_primary_color = None
 
         # Extract season_tags if present from worker payload
         season_tags = data.pop("season_tags", None)
+
+        if image_file:
+            try:
+                upload_result = upload_image_to_cloudinary(image_file)
+                image_url = upload_result.get("secure_url", image_url)
+                extracted_primary_color = upload_result.get("primary_color")
+            except Exception as e:
+                print(f"[IMAGE UPLOAD] Cloudinary upload fallback: {e}", flush=True)
+        elif image_url and isinstance(image_url, str) and image_url.startswith(("http://", "https://")) and image_url != instance.image_url and not is_cloudinary_url(image_url):
+            try:
+                upload_result = normalize_image_source_to_cloudinary(image_url)
+                image_url = upload_result.get("secure_url", image_url)
+                extracted_primary_color = upload_result.get("primary_color")
+            except Exception as e:
+                print(f"[IMAGE URL] Cloudinary remote-url fallback: {e}", flush=True)
+
+        if extracted_primary_color:
+            data["primary_color"] = extracted_primary_color
+        if image_url:
+            data["image_url"] = image_url
 
         serializer = self.get_serializer(instance, data=data, partial=partial)
         serializer.is_valid(raise_exception=True)
@@ -84,12 +105,26 @@ class WardrobeItemViewSet(viewsets.ModelViewSet):
                 print(f"[IMAGE UPLOAD] Cloudinary upload fallback: {e}", flush=True)
                 if not image_url:
                     image_url = "https://images.unsplash.com/photo-1544441893-675973e31985?w=600&q=80"
+        elif image_url and image_url.startswith(("http://", "https://")) and not is_cloudinary_url(image_url):
+            try:
+                upload_result = normalize_image_source_to_cloudinary(image_url)
+                image_url = upload_result.get("secure_url", image_url)
+                extracted_primary_color = upload_result.get("primary_color")
+            except Exception as e:
+                print(f"[IMAGE URL] Cloudinary remote-url fallback: {e}", flush=True)
 
         if not image_url:
             image_url = "https://images.unsplash.com/photo-1544441893-675973e31985?w=600&q=80"
 
-        # Determine final primary_color: Cloudinary extraction overrides blank user input
-        final_primary_color = payload.get("primary_color") or extracted_primary_color
+        # Prefer Cloudinary's extracted dominant color when an upload is present.
+        # Fall back to the submitted value only when no upload color is available.
+        final_primary_color = (
+            extracted_primary_color
+            if image_file and extracted_primary_color
+            else payload.get("primary_color") or extracted_primary_color
+        )
+        if final_primary_color:
+            payload["primary_color"] = final_primary_color
 
         serializer = self.get_serializer(data=payload)
         serializer.is_valid(raise_exception=True)
@@ -98,9 +133,6 @@ class WardrobeItemViewSet(viewsets.ModelViewSet):
             "user": self.request.user,
             "image_url": image_url,
         }
-        # Pass primary_color directly into save() so it cannot be lost by QueryDict immutability
-        if final_primary_color:
-            save_kwargs["primary_color"] = final_primary_color
 
         item = serializer.save(**save_kwargs)
 

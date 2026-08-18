@@ -14,21 +14,64 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY || "",
 });
 
-async function imageUrlToPart(imageUrl: string): Promise<GeminiImagePart> {
-  const response = await fetch(imageUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch image ${imageUrl}: ${response.status}`);
+async function fetchWithTimeout(
+  imageUrl: string,
+  timeoutMs = 30000,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(imageUrl, {
+      signal: controller.signal,
+      redirect: "follow",
+      headers: {
+        "user-agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        referer: "https://www.google.com/",
+        "cache-control": "no-cache",
+      },
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function imageUrlToPart(imageUrl: string): Promise<GeminiImagePart | null> {
+  if (!imageUrl || typeof imageUrl !== "string" || !imageUrl.startsWith("http")) {
+    return null;
+  }
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const response = await fetchWithTimeout(imageUrl, attempt === 1 ? 15000 : 25000);
+      if (!response.ok) {
+        console.warn(`[imageUrlToPart] fetch failed for ${imageUrl}: HTTP ${response.status}`);
+        return null;
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const mimeType = response.headers.get("content-type") || "image/jpeg";
+
+      return {
+        inlineData: {
+          mimeType,
+          data: buffer.toString("base64"),
+        },
+      };
+    } catch (error) {
+      lastError = error;
+      if (attempt < 2) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        continue;
+      }
+      console.warn(`[imageUrlToPart] Could not fetch image ${imageUrl}: ${error instanceof Error ? error.message : error}`);
+      return null;
+    }
   }
 
-  const buffer = Buffer.from(await response.arrayBuffer());
-  const mimeType = response.headers.get("content-type") || "image/jpeg";
-
-  return {
-    inlineData: {
-      mimeType,
-      data: buffer.toString("base64"),
-    },
-  };
+  return null;
 }
 
 export async function callGeminiVision(prompt: string, imageUrls: string[]): Promise<string> {
@@ -36,13 +79,20 @@ export async function callGeminiVision(prompt: string, imageUrls: string[]): Pro
     throw new Error("GEMINI_API_KEY is not configured");
   }
 
-  const imageParts = await Promise.all(imageUrls.map(imageUrlToPart));
+  const rawParts = await Promise.all(imageUrls.map(imageUrlToPart));
+  const imageParts = rawParts.filter((part): part is GeminiImagePart => part !== null);
+
+  const parts: Array<{ text: string } | GeminiImagePart> = [
+    { text: `${prompt}${GEMINI_PROMPT_SUFFIX}` },
+    ...imageParts,
+  ];
+
   const response = await ai.models.generateContent({
     model: GEMINI_MODEL,
     contents: [
       {
         role: "user",
-        parts: [{ text: `${prompt}${GEMINI_PROMPT_SUFFIX}` }, ...imageParts],
+        parts,
       },
     ],
     config: {

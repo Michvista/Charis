@@ -1,11 +1,11 @@
 import { Worker } from "bullmq";
-import { createRedisConnection } from "../shared/redis";
 import {
   callGeminiVision,
   parseGeminiJson,
   validateTaggingResult,
 } from "../shared/gemini";
 import { sendJson } from "../shared/http";
+import { createWorkerOptions } from "../shared/worker-options";
 import { TaggingJobData } from "../queues/tagging.queue";
 
 const TAGGING_PROMPT = `Analyze this clothing item image and return ONLY valid JSON with no markdown:
@@ -63,8 +63,6 @@ export function startTaggingWorker(): Worker<TaggingJobData> {
         throw error;
       }
     },
-    {
-      connection: createRedisConnection() as any,
-    },
+    createWorkerOptions(),
   );
 }

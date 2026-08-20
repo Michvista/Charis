@@ -5,9 +5,9 @@
 | Service | Framework | Language | Owns | Port |
 |---|---|---|---|---|
 | `backend/` | Django + DRF | Python | Auth, Wardrobe, Trip Planner, Social, Analytics, Style Advisor | 8000 |
-| `styling-service/` | **DolphJS (Spring OOP)** | TypeScript | Occasions, Outfits, Verdict, Combo generation | 3000 |
+| `styling-service/` | **DolphJS (Spring OOP)** | TypeScript | Occasions, Outfits, Verdict, Combo generation | 3300 |
 | `job-worker/` | Node + BullMQ | TypeScript | Async jobs (tagging, combos, verdict, notifications) | — (worker only) |
-| `frontend/` | React + Vite | TypeScript | All UI, Framer Motion, Recharts | 5173 |
+| `frontend/` | Next.js (React App Router) | TypeScript | All UI, Framer Motion, Recharts | 3000 |
 
 Shared infrastructure: **Postgres** (one DB, separate schemas per service) · **Redis** (job queue + cache)
 
@@ -68,29 +68,32 @@ backend/
     ├── social/          # OutfitShare, Comment, Vote
     ├── analytics/       # no new models (reads WearLog + WardrobeItem)
     │   └── aggregations.py  # sliding window, frequency, cost-per-wear
-    └── styleadvisor/    # StyleKnowledgeChunk, ShoppingSuggestion
-        └── retriever.py # RAG query logic (Google File Store)
+    ├── styleadvisor/    # StyleKnowledgeChunk, ShoppingSuggestion
+    │   └── retriever.py # RAG query logic (Google File Store)
+    └── outfits/         # Outfit (saved outfit snapshots) — CRUD via /api/outfits/
+        └── models.py    # JSON-snapshot items so social cards render for any viewer
 ```
 
-### `styling-service/` — MVC layered (DolphJS Spring OOP)
-DolphJS Spring mode = OOP controllers + TypeScript decorators. Each component folder owns one domain concept.
+### `styling-service/` — Clean Architecture (DolphJS Spring OOP)
+DolphJS Spring mode = OOP controllers + TypeScript decorators. The codebase is layered into application (use-cases), domain (entities + domain services), infrastructure (database + queue), and presentation (HTTP controllers/components).
 
 ```
 styling-service/
 ├── dolph_config.yaml        # DolphJS app config (port, cors, db)
 └── src/
     ├── server.ts            # app bootstrap
-    ├── shared/              # cross-component utilities
-    │   ├── guards/auth.guard.ts        # verifies JWT from Django auth
-    │   ├── decorators/user.decorator.ts
-    │   └── filters/exception.filter.ts
-    └── components/          # DolphJS calls route modules "components"
-        ├── occasions/       # Occasion CRUD
-        ├── verdict/         # 2-item + occasion → AI verdict
-        │   └── verdict.algorithms.ts  # graph-based compatibility scoring
-        ├── outfits/         # saved outfits, status polling
-        └── combos/          # outfit combo generation from wardrobe
-            └── combos.algorithms.ts   # backtracking constraint solver
+    ├── application/         # use-cases, dtos, mappers per bounded context
+    │   ├── occasion/        # Occasion use-cases
+    │   └── outfit/          # Outfit use-cases
+    ├── domain/              # entities, value-objects, aggregates, repositories
+    │   ├── occasion/
+    │   ├── outfit/
+    │   ├── verdict/         # verdict.algorithms.ts (graph compatibility scoring)
+    │   └── combos/          # combos.algorithms.ts (backtracking constraint solver)
+    ├── infrastructure/      # TypeORM database layer + BullMQ queue (redis.ts)
+    ├── presentation/http/   # controllers + components (routes)
+    │   └── components/      # occasion.component.ts · styling.component.ts
+    └── shared/              # auth guard, decorators, exception filters
 ```
 
 ### `job-worker/` — Queue/Processor pattern
@@ -108,35 +111,24 @@ job-worker/
     │   ├── tagging.processor.ts
     │   ├── verdict.processor.ts
     │   └── combo.processor.ts
-    └── notifications/       # notification logic (folded in, not a separate service)
-        ├── notification.service.ts   # send + dedupe logic
-        └── notification.worker.ts    # BullMQ worker for notification queue
+    ├── notifications/       # notification logic (folded in, not a separate service)
+    │   ├── notification.service.ts   # send + dedupe logic
+    │   └── notification.worker.ts    # BullMQ worker for notification queue
+    └── shared/              # redis.ts (connection) + worker-options.ts
 ```
 
-### `frontend/` — Feature-based folder structure
-Each feature folder is self-contained: its own page component (`index.tsx`), its own data-fetching hooks (`hooks.ts`), and it calls the relevant API file. Components that appear across features live in `components/`.
+### `frontend/` — Next.js App Router, page-per-route
+Pages live in `src/app/<route>/page.tsx`. Shared UI lives in `src/components/`, API modules in `src/api/`, and contexts/types in `src/lib/`. Outfit/verdict snapshot cards are shared between Styling, Outfits and Social via `components/outfits/`.
 
 ```
 frontend/
 └── src/
-    ├── api/                    # axios functions, one file per backend service
-    │   ├── client.ts           # base axios instance + interceptors
-    │   ├── wardrobe.api.ts     # calls Django wardrobe endpoints
-    │   ├── styling.api.ts      # calls DolphJS styling-service
-    │   └── analytics.api.ts    # calls Django analytics endpoint
-    ├── features/               # one folder per screen group
-    │   ├── wardrobe/           # grid, item detail, upload
-    │   ├── styling/            # verdict flow, combo generator
-    │   ├── tripplanner/        # trips list, create trip, packing list
-    │   ├── social/             # feed, share outfit
-    │   └── analytics/          # Recharts dashboard
-    └── components/
-        ├── ui/                 # Button, Card, Input (reusable primitives)
-        └── charts/             # 4 Recharts chart components
-            ├── WearFrequencyChart.tsx
-            ├── CategoryChart.tsx
-            ├── ColorChart.tsx
-            └── CostPerWearChart.tsx
+    ├── app/                 # pages (page, wardrobe, styling, outfits, trips,
+    │                        #      social, analytics, advisor, settings)
+    ├── api/                 # client.ts + per-service API modules
+    ├── components/          # layout/ (Shell, AuthGuard) · ui/ · outfits/
+    ├── lib/                 # types, AuthContext, ToastContext
+    └── data/                # static data
 ```
 
 ---
@@ -152,8 +144,26 @@ frontend/
 
 ## Models at a glance
 
-**Django (backend/):** User · WardrobeItem · WearLog · Season · Trip · TripEvent · PackingList · PackingListItem · OutfitShare · Comment · Vote · StyleKnowledgeChunk · ShoppingSuggestion
+**Django (backend/):** User · WardrobeItem · WearLog · Season · Trip · TripEvent · PackingList · PackingListItem · OutfitShare · Comment · Vote · StyleKnowledgeChunk · ShoppingSuggestion · Outfit
 
 **DolphJS/TypeORM (styling-service/):** Occasion · Outfit · OutfitItem
 
 **job-worker:** No models — stateless processor, reads/writes via API calls only
+
+---
+
+## Design system
+
+The frontend is styled with Tailwind CSS v4 using a bespoke editorial theme. Both typefaces and the core palette are defined once in `frontend/src/app/globals.css` under `@theme`:
+
+| Token            | Value                                    |
+| ---------------- | ---------------------------------------- |
+| Serif (headings) | **Playfair Display** (`--font-serif`)    |
+| Sans (UI text)   | **Hanken Grotesk** (`--font-sans`)       |
+| Background       | `#fff8f5` (warm ivory)                   |
+| Surface          | `#ffffff` / `#fbf2ed` / `#f5ece7`        |
+| Primary          | `#380208` (deep wine)                    |
+| Primary dark     | `#54161b`                                |
+| On-surface text  | `#1e1b18`                                |
+| Muted text       | `#544342` / `#867272`                    |
+| Outline          | `#d9c1c0` (blush)                        |

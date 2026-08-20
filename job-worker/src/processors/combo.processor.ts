@@ -1,11 +1,11 @@
 import { Worker } from "bullmq";
-import { createRedisConnection } from "../shared/redis";
 import {
   callGeminiVision,
   parseGeminiJson,
   validateComboVisualResult,
 } from "../shared/gemini";
 import { sendJson } from "../shared/http";
+import { createWorkerOptions } from "../shared/worker-options";
 import { ComboJobData } from "../queues/combo.queue";
 
 const getStylingServiceBaseUrl = (): string =>
@@ -126,8 +126,6 @@ export function startComboWorker(): Worker<ComboJobData> {
         throw error;
       }
     },
-    {
-      connection: createRedisConnection() as any,
-    },
+    createWorkerOptions(),
   );
 }

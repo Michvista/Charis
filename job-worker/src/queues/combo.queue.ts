@@ -1,6 +1,3 @@
-import { Queue } from "bullmq";
-import { createRedisConnection } from "../shared/redis";
-
 export interface ComboJobData {
   outfitId: string;
   wardrobeItems: Array<{
@@ -16,7 +13,3 @@ export interface ComboJobData {
   targetSeason?: string;
   maxResults?: number;
 }
-
-export const comboQueue = new Queue<ComboJobData>("combo-generation", {
-  connection: createRedisConnection() as any,
-});

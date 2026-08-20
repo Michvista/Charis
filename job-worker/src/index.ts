@@ -6,6 +6,7 @@ try {
 } catch {}
 
 import { Worker } from "bullmq";
+import { closeRedisConnection } from "./shared/redis";
 import { startTaggingWorker } from "./processors/tagging.processor";
 import { startComboWorker } from "./processors/combo.processor";
 import { startVerdictWorker } from "./processors/verdict.processor";

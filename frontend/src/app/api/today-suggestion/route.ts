@@ -12,12 +12,25 @@ const FALLBACK_SUGGESTIONS = [
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const userTimezone = body.timezone || 'UTC';
-    const currentTime = body.currentTime || new Date().toISOString();
+    const {
+      timezone = 'UTC',
+      currentTime = new Date().toISOString(),
+      temp,
+      condition,
+      season,
+      location,
+    } = body;
     const apiKey = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY;
 
     if (apiKey) {
       try {
+        const contextParts = [`timezone ${timezone}`, `local time ${currentTime}`];
+        if (temp) contextParts.push(`current temperature ${temp}°F`);
+        if (condition) contextParts.push(`weather conditions: ${condition}`);
+        if (season) contextParts.push(`season: ${season}`);
+        if (location) contextParts.push(`location: ${location}`);
+        const userContext = contextParts.join(', ');
+
         const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -33,7 +46,7 @@ export async function POST(req: Request) {
               },
               {
                 role: 'user',
-                content: `Generate today's outfit recommendation for a user in timezone ${userTimezone} at time ${currentTime}.`,
+                content: `Generate today's outfit recommendation for a user in ${userContext}. Ground the recommendation in the reported weather, season and location.`,
               },
             ],
             temperature: 0.9,

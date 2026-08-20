@@ -26,6 +26,7 @@ class PackingListItemSerializer(serializers.ModelSerializer):
     wardrobe_item_id = serializers.UUIDField(source="wardrobe_item.id", read_only=True)
     wardrobe_item_name = serializers.CharField(source="wardrobe_item.name", read_only=True)
     wardrobe_item_category = serializers.CharField(source="wardrobe_item.category", read_only=True)
+    wardrobe_item_image = serializers.CharField(source="wardrobe_item.image_url", read_only=True)
 
     class Meta:
         model = PackingListItem
@@ -34,6 +35,7 @@ class PackingListItemSerializer(serializers.ModelSerializer):
             "wardrobe_item_id",
             "wardrobe_item_name",
             "wardrobe_item_category",
+            "wardrobe_item_image",
             "covers_event_ids",
             "created_at",
             "updated_at",

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { AuthProvider } from '@/lib/context/AuthContext';
 import { ToastProvider } from '@/lib/context/ToastContext';
+import { OutfitsProvider } from '@/lib/context/OutfitsContext';
 
 export const metadata: Metadata = {
   title: 'Charis — Wardrobe OS',
@@ -21,9 +22,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <AuthProvider>
-          <ToastProvider>
-            {children}
-          </ToastProvider>
+          <OutfitsProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </OutfitsProvider>
         </AuthProvider>
       </body>
     </html>

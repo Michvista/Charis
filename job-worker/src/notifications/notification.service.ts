@@ -1,5 +1,5 @@
 import IORedis from "ioredis";
-import { createRedisConnection } from "../shared/redis";
+import { getRedisConnection } from "../shared/redis";
 
 export type NotificationType =
   | "weather_change"
@@ -19,7 +19,7 @@ export interface NotificationPayload {
  * same reminder is not emitted twice in rapid succession.
  */
 export class NotificationService {
-  constructor(private readonly redis: IORedis = createRedisConnection()) {}
+  constructor(private readonly redis: IORedis = getRedisConnection()) {}
 
   /**
    * Sends a structured console notification unless Redis says this dedupe key

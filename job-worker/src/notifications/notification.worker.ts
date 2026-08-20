@@ -1,5 +1,5 @@
 import { Worker } from "bullmq";
-import { createRedisConnection } from "../shared/redis";
+import { createWorkerOptions } from "../shared/worker-options";
 import {
   NotificationPayload,
   NotificationService,
@@ -38,8 +38,6 @@ export function startNotificationsWorker(): Worker<NotificationJobData> {
         throw error;
       }
     },
-    {
-      connection: createRedisConnection() as any,
-    },
+    createWorkerOptions(),
   );
 }

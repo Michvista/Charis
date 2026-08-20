@@ -14,15 +14,38 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY || "",
 });
 
+function getDjangoInternalBaseUrl(): string {
+  return process.env.DJANGO_INTERNAL_URL || "http://backend:8000";
+}
+
+function getImageFetchStrategies(): Array<{ viaProxy: boolean; label: string }> {
+  const djangoInternal = process.env.DJANGO_INTERNAL_URL?.trim();
+  if (djangoInternal) {
+    return [
+      { viaProxy: true, label: "backend-proxy" },
+      { viaProxy: false, label: "direct" },
+    ];
+  }
+  return [
+    { viaProxy: false, label: "direct" },
+    { viaProxy: true, label: "backend-proxy" },
+  ];
+}
+
+function buildImageProxyUrl(imageUrl: string): string {
+  return `${getDjangoInternalBaseUrl()}/api/internal/image-proxy/?url=${encodeURIComponent(imageUrl)}`;
+}
+
 async function fetchWithTimeout(
-  imageUrl: string,
+  url: string,
   timeoutMs = 30000,
+  extraHeaders: Record<string, string> = {},
 ): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    return await fetch(imageUrl, {
+    return await fetch(url, {
       signal: controller.signal,
       redirect: "follow",
       headers: {
@@ -31,6 +54,7 @@ async function fetchWithTimeout(
         accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
         referer: "https://www.google.com/",
         "cache-control": "no-cache",
+        ...extraHeaders,
       },
     });
   } finally {
@@ -38,36 +62,65 @@ async function fetchWithTimeout(
   }
 }
 
+async function downloadImage(
+  imageUrl: string,
+  viaProxy: boolean,
+): Promise<{ buffer: Buffer; mimeType: string }> {
+  const requestUrl = viaProxy ? buildImageProxyUrl(imageUrl) : imageUrl;
+  const headers: Record<string, string> = {};
+
+  if (viaProxy) {
+    headers.Authorization = `Bearer ${process.env.INTERNAL_API_KEY || ""}`;
+  }
+
+  const response = await fetchWithTimeout(requestUrl, 25000, headers);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  let mimeType = response.headers.get("content-type") || "image/jpeg";
+  if (mimeType.includes(";")) {
+    mimeType = mimeType.split(";", 1)[0].trim();
+  }
+
+  return { buffer, mimeType };
+}
+
+/**
+ * Fetches a remote wardrobe image and converts it to Gemini inlineData (base64).
+ * Tries direct CDN fetch first, then falls back to the Django internal proxy.
+ */
 async function imageUrlToPart(imageUrl: string): Promise<GeminiImagePart | null> {
   if (!imageUrl || typeof imageUrl !== "string" || !imageUrl.startsWith("http")) {
     return null;
   }
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    try {
-      const response = await fetchWithTimeout(imageUrl, attempt === 1 ? 15000 : 25000);
-      if (!response.ok) {
-        console.warn(`[imageUrlToPart] fetch failed for ${imageUrl}: HTTP ${response.status}`);
-        return null;
-      }
 
-      const buffer = Buffer.from(await response.arrayBuffer());
-      const mimeType = response.headers.get("content-type") || "image/jpeg";
+  const strategies = getImageFetchStrategies();
 
-      return {
-        inlineData: {
-          mimeType,
-          data: buffer.toString("base64"),
-        },
-      };
-    } catch (error) {
-      lastError = error;
-      if (attempt < 2) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        continue;
+  for (const { viaProxy, label } of strategies) {
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const { buffer, mimeType } = await downloadImage(imageUrl, viaProxy);
+        if (viaProxy) {
+          console.log(`[imageUrlToPart] fetched via ${label}: ${imageUrl}`);
+        }
+        return {
+          inlineData: {
+            mimeType,
+            data: buffer.toString("base64"),
+          },
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (attempt < 2) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          continue;
+        }
+        console.warn(
+          `[imageUrlToPart] ${label} fetch failed for ${imageUrl}: ${message}`,
+        );
       }
-      console.warn(`[imageUrlToPart] Could not fetch image ${imageUrl}: ${error instanceof Error ? error.message : error}`);
-      return null;
     }
   }
 
@@ -79,8 +132,24 @@ export async function callGeminiVision(prompt: string, imageUrls: string[]): Pro
     throw new Error("GEMINI_API_KEY is not configured");
   }
 
-  const rawParts = await Promise.all(imageUrls.map(imageUrlToPart));
+  const validUrls = imageUrls.filter(
+    (url) => url && typeof url === "string" && url.startsWith("http"),
+  );
+
+  const rawParts = await Promise.all(validUrls.map((url) => imageUrlToPart(url)));
   const imageParts = rawParts.filter((part): part is GeminiImagePart => part !== null);
+
+  if (validUrls.length > 0 && imageParts.length === 0) {
+    throw new Error(
+      `Could not fetch any of ${validUrls.length} outfit image(s) for Gemini vision analysis`,
+    );
+  }
+
+  if (validUrls.length > 0 && imageParts.length < validUrls.length) {
+    console.warn(
+      `[callGeminiVision] sending ${imageParts.length}/${validUrls.length} images to Gemini`,
+    );
+  }
 
   const parts: Array<{ text: string } | GeminiImagePart> = [
     { text: `${prompt}${GEMINI_PROMPT_SUFFIX}` },

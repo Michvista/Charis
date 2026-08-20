@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "apps.social",
     "apps.analytics",
     "apps.styleadvisor",
+    "apps.outfits",
 ]
 
 # CRITICAL: Define Custom User Model BEFORE initial migrations

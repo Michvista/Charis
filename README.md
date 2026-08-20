@@ -12,9 +12,9 @@ Built in public. Every phase documented on [YouTube](https://www.youtube.com/pla
 
 **Outfit generator** — Build full outfits from your existing wardrobe given an occasion and formality level. The styling service uses a backtracking constraint-satisfaction algorithm plus a weighted compatibility graph before the worker reranks the strongest candidates with Gemini vision.
 
-**Trip packing list** — Add a trip with multiple events. A greedy set-cover algorithm selects the minimum wardrobe items that cover every event with at least one valid outfit.
+**Trip packing list** — Add a trip with multiple events. The planner builds a formality- and season-aware capsule that assigns complementary pieces per event (dress/top/bottom/shoes/bag/outerwear) and tops it up with daywear for the days the trip spans.
 
-**Social feed** — Share outfits before you leave the house. Friends vote and comment.
+**Social feed** — Share outfits before you leave the house. Friends vote and comment. Saved outfits are persisted server-side and embedded in the share payload, so the full look (slideshow + AI verdict) renders for every viewer — not just the poster.
 
 **Analytics dashboard** — Cost-per-wear, wear frequency over time, color distribution, category breakdown. All computed from real wear logs, not manual counters.
 
@@ -33,7 +33,7 @@ Charis is split into four services:
 | `backend/`         | Django + DRF         | Auth, Wardrobe, Trip Planner, Social, Analytics, Style Advisor |
 | `styling-service/` | DolphJS (Spring OOP) | Occasions, Outfits, Verdict, Combo generation                  |
 | `job-worker/`      | Node + BullMQ        | Async jobs: image tagging, verdict, combos, notifications      |
-| `frontend/`        | React + Vite         | All UI                                                         |
+| `frontend/`        | Next.js (React)      | All UI                                                         |
 
 Shared infrastructure: **Postgres** · **Redis**
 
@@ -74,7 +74,7 @@ The worker side also includes a notifications queue that deduplicates repeated r
 | Core backend    | Python · Django · Django REST Framework |
 | Styling service | TypeScript · DolphJS · TypeORM          |
 | Async jobs      | Node · BullMQ · Redis                   |
-| Frontend        | React · Vite · TypeScript               |
+| Frontend        | Next.js · React · TypeScript           |
 | Animations      | Framer Motion                           |
 | Charts          | Recharts                                |
 | Database        | PostgreSQL                              |
@@ -93,7 +93,7 @@ This project uses real algorithms for real product reasons — not leetcode exer
 | --------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | Backtracking + constraint pruning | `styling-service/src/components/combos/combos.algorithms.ts`   | Generates valid outfit combos from N wardrobe items without brute-forcing every permutation                             |
 | Weighted graph scoring            | `styling-service/src/components/verdict/verdict.algorithms.ts` | Models color/formality compatibility as weighted edges; combo score = traversal over that graph                         |
-| Greedy set-cover approximation    | `backend/apps/tripplanner/algorithms.py`                       | Selects minimum wardrobe items to cover all trip events — NP-hard in general, greedy gives a fast near-optimal solution |
+| Greedy set-cover approximation    | `backend/apps/tripplanner/algorithms.py`                       | Builds a formality/season-aware capsule: complementary pieces per event plus daywear for the trip duration |
 | Sliding window aggregation        | `backend/apps/analytics/aggregations.py`                       | Computes wear frequency within a time window without a full table scan                                                  |
 
 ---
@@ -106,37 +106,58 @@ charis/
 ├── .env.example
 ├── architecture.md
 ├── backend/                        # Django
-│   ├── config/
+│   ├── config/                     # settings, urls, asgi, wsgi
+│   ├── common/                     # queue client, permissions, pagination
 │   └── apps/
 │       ├── accounts/               # Custom User model
-│       ├── wardrobe/               # WardrobeItem, WearLog
-│       ├── tripplanner/            # Trip, TripEvent, PackingList
+│       ├── wardrobe/               # WardrobeItem, WearLog, Season
+│       ├── tripplanner/            # Trip, TripEvent, PackingList (+ algorithms.py)
 │       ├── social/                 # OutfitShare, Comment, Vote
 │       ├── analytics/              # Aggregations (no new models)
-│       └── styleadvisor/           # RAG: StyleKnowledgeChunk, ShoppingSuggestion
-├── styling-service/                # DolphJS
-│   ├── src/                        # TypeORM entities and migrations
-│   └── src/
-│       ├── server.ts
-│       ├── shared/                 # Auth guard, decorators, filters
-│       └── components/
-│           ├── occasions/
-│           ├── verdict/            # + verdict.algorithms.ts
-│           ├── outfits/
-│           └── combos/             # + combos.algorithms.ts
+│       ├── styleadvisor/           # RAG: StyleKnowledgeChunk, ShoppingSuggestion
+│       └── outfits/                # Outfit (saved outfit snapshots, CRUD)
+├── styling-service/                # DolphJS (Clean Architecture)
+│   ├── src/
+│   │   ├── server.ts               # bootstrap
+│   │   ├── application/            # use-cases, dtos, mappers
+│   │   ├── domain/                 # entities, value-objects, aggregates, repositories
+│   │   ├── infrastructure/         # TypeORM database, BullMQ queue (redis.ts)
+│   │   ├── presentation/http/      # controllers + components (routes)
+│   │   └── shared/                 # auth guard, decorators, filters
 ├── job-worker/                     # BullMQ
 │   └── src/
+│       ├── index.ts                # starts all workers
 │       ├── queues/                 # tagging · verdict · combo
 │       ├── processors/             # one processor per queue
-│       └── notifications/          # debounced notification delivery
-└── frontend/                       # React
+│       ├── notifications/          # deduplicated notification delivery
+│       └── shared/                 # redis connection + worker options
+└── frontend/                       # Next.js (App Router)
     └── src/
-        ├── api/                    # client · wardrobe.api · styling.api · analytics.api
-        ├── features/               # wardrobe · styling · tripplanner · social · analytics
-        └── components/
-            ├── ui/                 # Button, Card, Input
-            └── charts/             # WearFrequency · Category · Color · CostPerWear
+        ├── app/                    # pages: page, wardrobe, styling, outfits,
+        │                           #       trips, social, analytics, advisor, settings
+        ├── api/                    # client + per-service API modules
+        ├── components/             # layout, ui, outfits (shared components)
+        ├── lib/                    # types, auth + toast contexts
+        └── data/                   # static data
 ```
+
+---
+
+## Design system
+
+The frontend is styled with Tailwind CSS v4 using a bespoke editorial theme. The two typefaces and core palette are defined once in `frontend/src/app/globals.css` under `@theme`:
+
+| Token            | Value                                    |
+| ---------------- | ---------------------------------------- |
+| Serif (headings) | **Playfair Display** (`--font-serif`)    |
+| Sans (UI text)   | **Hanken Grotesk** (`--font-sans`)       |
+| Background       | `#fff8f5` (warm ivory)                   |
+| Surface          | `#ffffff` / `#fbf2ed` / `#f5ece7`        |
+| Primary          | `#380208` (deep wine)                    |
+| Primary dark     | `#54161b`                                |
+| On-surface text  | `#1e1b18`                                |
+| Muted text       | `#544342` / `#867272`                    |
+| Outline          | `#d9c1c0` (blush)                        |
 
 ---
 

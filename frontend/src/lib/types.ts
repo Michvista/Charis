@@ -74,6 +74,7 @@ export type PackingListItem = {
   wardrobe_item_id: string;
   wardrobe_item_name: string;
   wardrobe_item_category: string;
+  wardrobe_item_image?: string | null;
   covers_event_ids: string[];
   created_at: string;
   updated_at: string;

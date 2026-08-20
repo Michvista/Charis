@@ -2,6 +2,9 @@ from django.db.models import Q
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
+from apps.outfits.models import Outfit
+from apps.outfits.serializers import OutfitSerializer
+
 from .models import Comment, Friendship, OutfitShare, Vote
 
 User = get_user_model()
@@ -34,6 +37,7 @@ class OutfitShareSerializer(serializers.ModelSerializer):
     comment_count = serializers.SerializerMethodField()
     vote_breakdown = serializers.SerializerMethodField()
     comments = CommentSerializer(many=True, read_only=True)
+    outfit = serializers.SerializerMethodField()
 
     class Meta:
         model = OutfitShare
@@ -42,6 +46,7 @@ class OutfitShareSerializer(serializers.ModelSerializer):
             "user",
             "user_email",
             "outfit_id",
+            "outfit",
             "caption",
             "visibility",
             "shared_at",
@@ -56,6 +61,7 @@ class OutfitShareSerializer(serializers.ModelSerializer):
             "id",
             "user",
             "user_email",
+            "outfit",
             "shared_at",
             "vote_count",
             "comment_count",
@@ -64,6 +70,12 @@ class OutfitShareSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def get_outfit(self, obj):
+        outfit = Outfit.objects.filter(outfit_id=obj.outfit_id).first()
+        if outfit is None:
+            return None
+        return OutfitSerializer(outfit).data
 
     def get_vote_count(self, obj):
         return obj.votes.count()

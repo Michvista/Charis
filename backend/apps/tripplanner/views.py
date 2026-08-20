@@ -33,7 +33,7 @@ class TripViewSet(viewsets.ModelViewSet):
             WardrobeItem.objects.filter(user=request.user).prefetch_related("seasons")
         )
 
-        selections = greedy_packing_list(wardrobe_items, trip_events)
+        selections = greedy_packing_list(wardrobe_items, trip_events, trip=trip)
 
         with transaction.atomic():
             packing_list = PackingList.objects.create(trip=trip)

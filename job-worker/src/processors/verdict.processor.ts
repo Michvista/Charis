@@ -1,11 +1,11 @@
 import { Worker } from "bullmq";
-import { createRedisConnection } from "../shared/redis";
 import {
   callGeminiVision,
   parseGeminiJson,
   validateVerdictResult,
 } from "../shared/gemini";
 import { sendJson } from "../shared/http";
+import { createWorkerOptions } from "../shared/worker-options";
 import { VerdictJobData } from "../queues/verdict.queue";
 
 const getStylingServiceBaseUrl = (): string =>
@@ -68,8 +68,6 @@ export function startVerdictWorker(): Worker<VerdictJobData> {
         throw error;
       }
     },
-    {
-      connection: createRedisConnection() as any,
-    },
+    createWorkerOptions(),
   );
 }

@@ -34,7 +34,7 @@ export default function AdvisorPage() {
 
   const [suggestions, setSuggestions] = useState<StyleAdvisorSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
-  const [occasion, setOccasion] = useState('Formal dinner with gallery opening styling constraints');
+  const [occasion, setOccasion] = useState('');
 
   // Real wardrobe context for RAG
   const [wardrobeItems, setWardrobeItems] = useState<WardrobeItem[]>([]);
@@ -216,7 +216,7 @@ export default function AdvisorPage() {
               className="flex-1 border-none outline-none text-sm text-[#1e1b18] bg-transparent font-medium placeholder:text-[#867272]"
               value={occasion}
               onChange={(e) => setOccasion(e.target.value)}
-              placeholder="Describe your occasion or aesthetic query..."
+              placeholder="e.g. Formal dinner with gallery opening styling constraints"
             />
             <button
               onClick={handleRefresh}

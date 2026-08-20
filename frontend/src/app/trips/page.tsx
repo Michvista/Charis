@@ -258,9 +258,9 @@ export default function TripsPage() {
                     ) : (
                       <div className="flex flex-col gap-6 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-px before:bg-[#d9c1c0]">
                         {selectedTrip.trip_events?.map((event, i) => {
-                          const assignedItem = packingItems.find(
-                            (pi) => pi.wardrobe_item_category === event.name || i === 0
-                          ) || packingItems[i];
+                          const assignedItems = packingItems.filter((pi) =>
+                            (pi.covers_event_ids || []).includes(event.id)
+                          );
 
                           return (
                             <div key={event.id} className="flex gap-6">
@@ -274,13 +274,25 @@ export default function TripsPage() {
 
                                 {event.notes && <p className="text-xs text-[#544342] leading-relaxed">{event.notes}</p>}
 
-                                {assignedItem ? (
-                                  <div className="flex items-center gap-4 p-3.5 bg-[#fbf2ed] rounded-xl border border-[#d9c1c0]/40">
-                                    <HugeiconsIcon icon={CheckmarkCircle02Icon} size={18} className="text-emerald-700 shrink-0" />
-                                    <div>
-                                      <span className="eyebrow text-[10px]">Assigned Capsule Piece</span>
-                                      <p className="serif text-sm font-semibold text-[#1e1b18] mt-0.5">{assignedItem.wardrobe_item_name}</p>
-                                      <p className="text-xs text-[#867272] capitalize">{assignedItem.wardrobe_item_category}</p>
+                                {assignedItems.length > 0 ? (
+                                  <div className="flex flex-col gap-2">
+                                    <span className="eyebrow text-[10px]">Assigned Capsule Pieces</span>
+                                    <div className="flex gap-2.5 flex-wrap">
+                                      {assignedItems.map((pi) => (
+                                        <div key={pi.id} className="flex items-center gap-2.5 p-2 bg-[#fbf2ed] rounded-xl border border-[#d9c1c0]/40 min-w-0">
+                                          <div className="w-10 h-12 rounded-lg overflow-hidden shrink-0 bg-white border border-[#d9c1c0]/40">
+                                            <img
+                                              src={pi.wardrobe_item_image || 'https://images.unsplash.com/photo-1544441893-675973e31985?w=100&q=80'}
+                                              alt={pi.wardrobe_item_name}
+                                              className="w-full h-full object-cover"
+                                            />
+                                          </div>
+                                          <div className="min-w-0">
+                                            <p className="serif text-xs font-semibold text-[#1e1b18] truncate">{pi.wardrobe_item_name}</p>
+                                            <p className="text-[10px] text-[#867272] capitalize">{pi.wardrobe_item_category}</p>
+                                          </div>
+                                        </div>
+                                      ))}
                                     </div>
                                   </div>
                                 ) : (
@@ -330,7 +342,13 @@ export default function TripsPage() {
                       ) : (
                         packingItems.map((pi) => (
                           <div key={pi.id} className="flex items-center gap-3 p-2.5 bg-[#fbf2ed] rounded-xl border border-[#d9c1c0]/40">
-                            <HugeiconsIcon icon={CheckmarkCircle02Icon} size={16} className="text-emerald-700 shrink-0" />
+                            <div className="w-9 h-11 rounded-lg overflow-hidden shrink-0 bg-white border border-[#d9c1c0]/40">
+                              <img
+                                src={pi.wardrobe_item_image || 'https://images.unsplash.com/photo-1544441893-675973e31985?w=100&q=80'}
+                                alt={pi.wardrobe_item_name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
                             <div className="min-w-0 flex-1">
                               <p className="serif text-xs font-bold text-[#1e1b18] truncate">{pi.wardrobe_item_name}</p>
                               <p className="text-[10px] text-[#867272] uppercase tracking-wider">{pi.wardrobe_item_category}</p>

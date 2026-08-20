@@ -27,6 +27,22 @@ import type { AnalyticsOverview, WardrobeItem } from '@/lib/types';
 const CATEGORY_COLORS = ['#380208', '#54161b', '#867272', '#5e5e5b', '#191810', '#d9c1c0', '#867272'];
 const DEFAULT_CATEGORIES = ['top', 'bottom', 'outerwear', 'shoes', 'accessory'];
 
+function ChartTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  const entry = payload[0];
+  const subject = entry.payload?.subject;
+  const heading = subject
+    ? `${subject} · ${entry.value} ${entry.value === 1 ? 'item' : 'items'}`
+    : `Day: ${label}`;
+  const subtext = subject ? 'Category distribution' : 'Wear frequency';
+  return (
+    <div className="bg-[#1e1b18] text-white rounded-lg px-3 py-2 shadow-xl border border-white/10 text-xs min-w-[150px]">
+      <div className="font-bold tracking-wide text-white">{heading}</div>
+      <div className="mt-0.5 text-white/80">{subtext}</div>
+    </div>
+  );
+}
+
 export default function AnalyticsPage() {
   const { session } = useAuth();
   const [analytics, setAnalytics] = useState<AnalyticsOverview | null>(null);
@@ -169,16 +185,7 @@ export default function AnalyticsPage() {
                         <PolarGrid stroke="#d9c1c0" />
                         <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11, fill: '#1e1b18', fontWeight: 600 }} />
                         <Radar dataKey="value" stroke="#380208" fill="#380208" fillOpacity={0.25} strokeWidth={2} />
-                        <Tooltip
-                          formatter={(val: any) => [`${val} items`, 'Count']}
-                          contentStyle={{
-                            background: '#1e1b18',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '8px',
-                            fontSize: '12px',
-                          }}
-                        />
+                        <Tooltip content={<ChartTooltip />} cursor={false} />
                       </RadarChart>
                     </ResponsiveContainer>
                   </div>
@@ -219,18 +226,7 @@ export default function AnalyticsPage() {
                     <BarChart data={barData} barSize={32}>
                       <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#544342', fontWeight: 600 }} />
                       <YAxis hide />
-                      <Tooltip
-                        formatter={(value: any) => [`${value} Wears`, 'Wear Count']}
-                        labelFormatter={(label) => `Day: ${label}`}
-                        contentStyle={{
-                          background: '#1e1b18',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '8px',
-                          fontSize: '12px',
-                        }}
-                        cursor={false}
-                      />
+                      <Tooltip content={<ChartTooltip />} cursor={false} />
                       <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                         {barData.map((d) => (
                           <Cell key={d.day} fill={d.day === maxDay.day ? '#380208' : '#f5ece7'} />

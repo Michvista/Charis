@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
-from typing import Iterable
+from typing import Iterable, Optional
 
 from apps.wardrobe.models import WardrobeItem
 
@@ -25,6 +25,19 @@ SEASON_BY_MONTH = {
     11: "fall",
 }
 
+# Which item categories a capsule should try to fill per formality band.
+# Formal events get a fuller look (dress + layering + bag + accessories);
+# casual events still get a complete top/bottom/shoes base.
+CATEGORY_PRIORITY_BY_FORMALITY = {
+    5: ["dress", "top", "bottom", "shoes", "bag", "outerwear", "accessory"],
+    4: ["dress", "top", "bottom", "shoes", "bag", "outerwear", "accessory"],
+    3: ["top", "bottom", "shoes", "outerwear", "accessory"],
+    2: ["top", "bottom", "shoes", "outerwear", "accessory"],
+    1: ["top", "bottom", "shoes", "accessory"],
+}
+
+TRAVEL_CATEGORIES = ["top", "bottom", "shoes"]
+
 
 @dataclass(frozen=True)
 class PackedItem:
@@ -37,59 +50,112 @@ def _season_for_date(value: date) -> str:
 
 
 def _item_seasons(item: WardrobeItem) -> set[str]:
-    return {
-        season.name.lower()
-        for season in item.seasons.all()
-    }
+    return {season.name.lower() for season in item.seasons.all()}
 
 
-def _item_covers_event(item: WardrobeItem, event: TripEvent) -> bool:
-    item_seasons = _item_seasons(item)
-    event_season = _season_for_date(event.date)
-    formality_match = abs((item.formality_level or 0) - (event.formality_required or 0)) <= 1
-    season_match = (not item_seasons) or (event_season in item_seasons)
-    return formality_match and season_match
+def _item_fit(item: WardrobeItem, target_formality: int, event: Optional[TripEvent] = None) -> int:
+    """Lower is a better match. Formality distance dominates, season mismatch adds a penalty."""
+    formality_dist = abs((item.formality_level or 0) - target_formality)
+    penalty = 0
+    if event is not None:
+        seasons = _item_seasons(item)
+        if seasons and _season_for_date(event.date) not in seasons:
+            penalty = 5
+    return formality_dist + penalty
+
+
+def _pick_for_event(
+    wardrobe_items: list[WardrobeItem],
+    used_ids: set,
+    event: TripEvent,
+    category: str,
+) -> Optional[WardrobeItem]:
+    candidates = [
+        item
+        for item in wardrobe_items
+        if item.id not in used_ids and (item.category or "").lower() == category
+    ]
+    if not candidates:
+        return None
+    best = min(
+        candidates,
+        key=lambda it: _item_fit(it, event.formality_required or 3, event),
+    )
+    # Allow a small formality drift, but never bridge e.g. a 1 with a 5.
+    if _item_fit(best, event.formality_required or 3, event) <= 6:
+        return best
+    return None
+
+
+def _pick_travel_item(
+    wardrobe_items: list[WardrobeItem],
+    used_ids: set,
+    category: str,
+) -> Optional[WardrobeItem]:
+    candidates = [
+        item
+        for item in wardrobe_items
+        if item.id not in used_ids and (item.category or "").lower() == category
+    ]
+    if not candidates:
+        return None
+    # Prefer casual, low-formality pieces for travel days.
+    return min(candidates, key=lambda it: (it.formality_level or 3))
 
 
 def greedy_packing_list(
     wardrobe_items: list[WardrobeItem],
     trip_events: list[TripEvent],
+    trip=None,
 ) -> list[dict[str, object]]:
-    uncovered_event_ids = {str(event.id) for event in trip_events}
     selected: list[dict[str, object]] = []
-    remaining_items = list(wardrobe_items)
+    used_ids: set = set()
 
-    while uncovered_event_ids and remaining_items:
-        best_item = None
-        best_covered: list[str] = []
+    # 1. Fill every scheduled event with a full capsule across complementary categories.
+    for event in sorted(
+        trip_events,
+        key=lambda e: e.formality_required or 0,
+        reverse=True,
+    ):
+        categories = CATEGORY_PRIORITY_BY_FORMALITY.get(
+            event.formality_required,
+            ["top", "bottom", "shoes", "outerwear", "accessory"],
+        )
+        for category in categories:
+            item = _pick_for_event(wardrobe_items, used_ids, event, category)
+            if item is None:
+                continue
+            selected.append(
+                {
+                    "wardrobe_item": item,
+                    "covers_event_ids": [str(event.id)],
+                }
+            )
+            used_ids.add(item.id)
 
-        for item in remaining_items:
-            covered = [
-                str(event.id)
-                for event in trip_events
-                if str(event.id) in uncovered_event_ids and _item_covers_event(item, event)
-            ]
+    # 2. Add daywear/travel pieces to cover the days the trip spans beyond the events.
+    if trip is not None and trip.start_date and trip.end_date:
+        day_count = (trip.end_date - trip.start_date).days + 1
+    elif trip_events:
+        dates = sorted(e.date for e in trip_events)
+        day_count = (dates[-1] - dates[0]).days + 1
+    else:
+        day_count = 0
 
-            if len(covered) > len(best_covered):
-                best_item = item
-                best_covered = covered
-            elif len(covered) == len(best_covered) and covered and best_item is not None:
-                current_key = (item.name.lower(), str(item.id))
-                best_key = (best_item.name.lower(), str(best_item.id))
-                if current_key < best_key:
-                    best_item = item
-                    best_covered = covered
-
-        if not best_item or not best_covered:
-            break
-
+    travel_needed = max(0, day_count - len(selected))
+    category_idx = 0
+    for _ in range(travel_needed):
+        category = TRAVEL_CATEGORIES[category_idx % len(TRAVEL_CATEGORIES)]
+        category_idx += 1
+        item = _pick_travel_item(wardrobe_items, used_ids, category)
+        if item is None:
+            continue
         selected.append(
             {
-                "wardrobe_item": best_item,
-                "covers_event_ids": best_covered,
+                "wardrobe_item": item,
+                "covers_event_ids": [],
             }
         )
-        uncovered_event_ids -= set(best_covered)
-        remaining_items = [item for item in remaining_items if item.id != best_item.id]
+        used_ids.add(item.id)
 
     return selected

@@ -11,6 +11,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { FavouriteIcon, Comment01Icon, Bookmark01Icon, PlusSignIcon, SentIcon, UserAdd01Icon, Search01Icon, Cancel01Icon, Loading01Icon } from '@hugeicons/core-free-icons';
 import type { OutfitShare, UserProfile } from '@/lib/types';
+import { useOutfits } from '@/lib/context/OutfitsContext';
+import OutfitSnapshotCard from '@/components/outfits/OutfitSnapshotCard';
 
 export default function SocialPage() {
   const { session } = useAuth();
@@ -36,7 +38,8 @@ export default function SocialPage() {
   const [submittingComment, setSubmittingComment] = useState<Record<string, boolean>>({});
 
   const [selectedOutfitId, setSelectedOutfitId] = useState<string>('');
-  const [savedOutfitsList, setSavedOutfitsList] = useState<any[]>([]);
+
+  const { outfits: savedOutfitsList } = useOutfits();
 
   // Profile tab: search
   const [profileSearch, setProfileSearch] = useState('');
@@ -46,11 +49,8 @@ export default function SocialPage() {
   const [viewingUser, setViewingUser] = useState<{ userId: string; userEmail: string } | null>(null);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('charis.saved_outfits');
-      if (raw) setSavedOutfitsList(JSON.parse(raw));
-    } catch {}
-  }, []);
+    loadData();
+  }, [session]);
 
   const formatUserHandle = (email?: string) => {
     if (!email) return 'CURATOR';
@@ -109,51 +109,57 @@ export default function SocialPage() {
     if (votingPosts.has(shareId)) return;
 
     const isCurrentlyLiked = likedPosts.has(shareId);
-    setVotingPosts((prev) => new Set([...prev, shareId]));
+    const targetLiked = !isCurrentlyLiked;
+    const delta = targetLiked ? 1 : -1;
 
+    // Optimistic update: apply instantly so the like feels immediate
+    setLikedPosts((prev) => {
+      const next = new Set(prev);
+      if (targetLiked) next.add(shareId);
+      else next.delete(shareId);
+      return next;
+    });
+    setShares((prev) =>
+      prev.map((s) =>
+        s.id === shareId
+          ? {
+              ...s,
+              vote_count: Math.max(0, (s.vote_count || 0) + delta),
+              vote_breakdown: {
+                upvotes: Math.max(0, (s.vote_breakdown?.upvotes || 0) + delta),
+                downvotes: s.vote_breakdown?.downvotes || 0,
+              },
+            }
+          : s
+      )
+    );
+
+    setVotingPosts((prev) => new Set([...prev, shareId]));
     try {
-      if (isCurrentlyLiked) {
-        await voteShare(session.accessToken, shareId, -1);
-        setLikedPosts((prev) => {
-          const next = new Set(prev);
-          next.delete(shareId);
-          return next;
-        });
-        setShares((prev) =>
-          prev.map((s) =>
-            s.id === shareId
-              ? {
-                  ...s,
-                  vote_count: Math.max(0, (s.vote_count || 1) - 1),
-                  vote_breakdown: {
-                    upvotes: Math.max(0, (s.vote_breakdown?.upvotes || 1) - 1),
-                    downvotes: s.vote_breakdown?.downvotes || 0,
-                  },
-                }
-              : s
-          )
-        );
-        toastSuccess('Unliked Post', 'Removed your upvote.');
-      } else {
-        await voteShare(session.accessToken, shareId, 1);
-        setLikedPosts((prev) => new Set([...prev, shareId]));
-        setShares((prev) =>
-          prev.map((s) =>
-            s.id === shareId
-              ? {
-                  ...s,
-                  vote_count: (s.vote_count || 0) + 1,
-                  vote_breakdown: {
-                    upvotes: (s.vote_breakdown?.upvotes || 0) + 1,
-                    downvotes: s.vote_breakdown?.downvotes || 0,
-                  },
-                }
-              : s
-          )
-        );
-        toastSuccess('Liked Post', 'Upvote added to look.');
-      }
+      await voteShare(session.accessToken, shareId, delta);
+      toastSuccess(targetLiked ? 'Liked Post' : 'Unliked Post', targetLiked ? 'Upvote added to look.' : 'Removed your upvote.');
     } catch (err) {
+      // Revert on failure
+      setLikedPosts((prev) => {
+        const next = new Set(prev);
+        if (isCurrentlyLiked) next.add(shareId);
+        else next.delete(shareId);
+        return next;
+      });
+      setShares((prev) =>
+        prev.map((s) =>
+          s.id === shareId
+            ? {
+                ...s,
+                vote_count: Math.max(0, (s.vote_count || 0) - delta),
+                vote_breakdown: {
+                  upvotes: Math.max(0, (s.vote_breakdown?.upvotes || 0) - delta),
+                  downvotes: s.vote_breakdown?.downvotes || 0,
+                },
+              }
+            : s
+        )
+      );
       toastError('Vote Failed', err instanceof Error ? err.message : 'Could not register vote.');
     } finally {
       setVotingPosts((prev) => {
@@ -297,8 +303,8 @@ export default function SocialPage() {
                             <option value="">(Optional: Attach Saved Outfit or Item)</option>
                             <optgroup label="Saved Outfits Archive">
                               {savedOutfitsList.map((o: any) => (
-                                <option key={o.outfitId} value={o.outfitId}>
-                                  {o.verdict === 'works' ? '✓' : '~'} Outfit ({o.score}%) — {o.items?.map((i: any) => i.name).join(', ') || o.outfitId.slice(0, 8)}
+                                <option key={o.id} value={o.outfit_id}>
+                                  {o.verdict === 'works' ? '✓' : '~'} Outfit ({o.score}%) — {o.items?.map((i: any) => i.name).join(', ') || o.outfit_id.slice(0, 8)}
                                 </option>
                               ))}
                             </optgroup>
@@ -381,21 +387,29 @@ export default function SocialPage() {
 
                         <p className="text-sm leading-relaxed text-[#1e1b18]">{share.caption}</p>
 
+                        {(share as any).outfit && (
+                          <OutfitSnapshotCard
+                            snapshot={{
+                              outfitId: (share as any).outfit.outfit_id,
+                              score: (share as any).outfit.score,
+                              verdict: (share as any).outfit.verdict,
+                              visualNotes: (share as any).outfit.visual_notes,
+                              items: (share as any).outfit.items || [],
+                            }}
+                          />
+                        )}
+
                         {/* Actions Bar */}
                         <div className="flex justify-between items-center border-t border-[#d9c1c0]/40 pt-3">
                           <div className="flex gap-5">
                             <button
                               onClick={() => handleVote(share.id)}
                               disabled={isVoting}
-                              className={`flex items-center gap-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                              className={`flex items-center gap-1.5 text-xs font-semibold transition-colors ${
                                 isLiked ? 'text-red-600' : 'text-[#544342] hover:text-red-700'
                               }`}
                             >
-                              {isVoting ? (
-                                <HugeiconsIcon icon={Loading01Icon} size={15} className="animate-spin" />
-                              ) : (
-                                <HugeiconsIcon icon={FavouriteIcon} size={16} className={isLiked ? 'fill-red-600 text-red-600' : ''} />
-                              )}
+                              <HugeiconsIcon icon={FavouriteIcon} size={16} className={isLiked ? 'fill-red-600 text-red-600' : ''} />
                               <span>{(share.vote_breakdown?.upvotes || 0)} Likes</span>
                             </button>
                             <button

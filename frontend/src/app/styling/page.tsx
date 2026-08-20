@@ -5,6 +5,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { useAuth } from '@/lib/context/AuthContext';
 import { useToast } from '@/lib/context/ToastContext';
+import { useOutfits } from '@/lib/context/OutfitsContext';
 import { listWardrobeItems } from '@/api/wardrobe.api';
 import { listOccasions, createOccasion, generateCombos, requestVerdict, fetchVerdict } from '@/api/styling.api';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -27,6 +28,7 @@ const ITEM_CATEGORIES = ['All', 'top', 'bottom', 'outerwear', 'shoes', 'accessor
 export default function StylingPage() {
   const { session } = useAuth();
   const { toastSuccess, toastError } = useToast();
+  const { saveOutfit, isSaved } = useOutfits();
 
   const [wardrobeItems, setWardrobeItems] = useState<WardrobeItem[]>([]);
   const [occasions, setOccasions] = useState<Occasion[]>([]);
@@ -577,28 +579,40 @@ export default function StylingPage() {
                 className={`w-full py-3.5 border rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
                   !verdict?.outfitId || verdict?.status === 'processing'
                     ? 'border-[#d9c1c0]/40 text-[#867272]/50 bg-gray-50/50 opacity-40 cursor-not-allowed'
-                    : 'border-[#d9c1c0] text-[#1e1b18] bg-white hover:border-[#380208] cursor-pointer'
+                    : isSaved(verdict.outfitId)
+                      ? 'border-emerald-300 text-emerald-700 bg-emerald-50 cursor-default'
+                      : 'border-[#d9c1c0] text-[#1e1b18] bg-white hover:border-[#380208] cursor-pointer'
                 }`}
                 disabled={!verdict?.outfitId || verdict?.status === 'processing'}
-                onClick={() => {
+                onClick={async () => {
                   if (!verdict?.outfitId) return;
-                  const savedOutfits = JSON.parse(localStorage.getItem('charis.saved_outfits') || '[]');
-                  const already = savedOutfits.some((o: any) => o.outfitId === verdict.outfitId);
-                  if (!already) {
-                    savedOutfits.unshift({
-                      outfitId: verdict.outfitId,
-                      savedAt: new Date().toISOString(),
+                  if (isSaved(verdict.outfitId)) {
+                    toastSuccess('Already Saved', 'This ensemble is already in your archive.');
+                    return;
+                  }
+                  try {
+                    await saveOutfit({
+                      outfit_id: verdict.outfitId,
+                      name: `Ensemble (${score}%)`,
                       score,
                       verdict: parsedVerdict?.verdict || 'works',
-                      visualNotes: parsedVerdict?.visualNotes || '',
-                      items: selectedItemsList.map((i) => ({ name: i.name, image_url: i.image_url, category: i.category })),
+                      visual_notes: parsedVerdict?.visualNotes || '',
+                      items: selectedItemsList.map((i) => ({
+                        name: i.name,
+                        image_url: i.image_url,
+                        category: i.category,
+                        color_hex: i.primary_color,
+                        formality_level: i.formality_level,
+                      })),
                     });
-                    localStorage.setItem('charis.saved_outfits', JSON.stringify(savedOutfits));
+                    toastSuccess('Outfit Saved', 'Ensemble saved to your outfits archive. View it in the Outfits page.');
+                  } catch (err) {
+                    toastError('Save Failed', err instanceof Error ? err.message : 'Could not save outfit.');
                   }
-                  toastSuccess('Outfit Saved', 'Ensemble saved to your outfits archive. View it in the Outfits page.');
                 }}
               >
-                <HugeiconsIcon icon={FloppyDiskIcon} size={16} /> Save Outfit to Archive
+                <HugeiconsIcon icon={FloppyDiskIcon} size={16} />
+                {verdict?.outfitId && isSaved(verdict.outfitId) ? '✓ Saved to Archive' : 'Save Outfit to Archive'}
               </button>
 
               <button

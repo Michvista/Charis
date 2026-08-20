@@ -22,7 +22,6 @@ const REDIS_OPTIONS: RedisOptions = {
 
 let sharedConnection: IORedis | null = null;
 
-/** One shared connection for queues, dedupe keys, and non-blocking use. */
 export function getRedisConnection(): IORedis {
   if (!sharedConnection) {
     const redisUrl = normalizeRedisUrl(process.env.REDIS_URL || "redis://localhost:6379");
@@ -31,19 +30,6 @@ export function getRedisConnection(): IORedis {
   return sharedConnection;
 }
 
-/** BullMQ workers need a dedicated connection for blocking commands. */
 export function createWorkerRedisConnection(): IORedis {
   return getRedisConnection().duplicate();
-}
-
-/** @deprecated Prefer getRedisConnection() or createWorkerRedisConnection(). */
-export function createRedisConnection(): IORedis {
-  return getRedisConnection();
-}
-
-export async function closeRedisConnection(): Promise<void> {
-  if (sharedConnection) {
-    await sharedConnection.quit();
-    sharedConnection = null;
-  }
 }

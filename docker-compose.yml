@@ -63,3 +63,4 @@ services:
       NODE_OPTIONS: "--dns-result-order=ipv4first"
       DATABASE_URL: ${DATABASE_URL}
       UV_THREADPOOL_SIZE: "128"
+      REDIS_URL: ${REDIS_URL}

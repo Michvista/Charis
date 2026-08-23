@@ -39,6 +39,32 @@ function makeUrl(base: string, path: string) {
   return `${cleanBase}${cleanPath}`;
 }
 
+function friendlyMessage(status: number, message: string, payload: unknown): string {
+  if (status === 401) {
+    const obj = (typeof payload === "object" && payload !== null ? payload : {}) as Record<string, unknown>;
+    const text = `${obj.detail ?? obj.code ?? message}`.toLowerCase();
+    const isLoginAttempt = /no active account|invalid password|credentials|password|register/i.test(text);
+    // Only rewrite genuine token/session failures — leave login errors readable.
+    if (!isLoginAttempt && /token|session|auth|expired|signature|jwt|bearer/i.test(text)) {
+      return "Your session has expired. Please sign in again.";
+    }
+    return message;
+  }
+  if (status === 403) {
+    return "You don't have permission to do that.";
+  }
+  if (status === 404) {
+    return "We couldn't find what you were looking for.";
+  }
+  if (status === 429) {
+    return "Too many requests — please try again in a moment.";
+  }
+  if (status >= 500) {
+    return "Something went wrong on our end. Please try again.";
+  }
+  return message;
+}
+
 async function parseResponse<T>(response: Response): Promise<T> {
   const contentType = response.headers.get('content-type') ?? '';
   const isJson = contentType.includes('application/json');
@@ -61,6 +87,9 @@ async function parseResponse<T>(response: Response): Promise<T> {
     } else if (typeof payload === 'string' && payload) {
       message = payload;
     }
+
+    message = friendlyMessage(response.status, message, payload);
+
     if (response.status === 401 && typeof window !== 'undefined') {
       clearSession();
       if (!window.location.pathname.startsWith('/login')) {

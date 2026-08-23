@@ -265,9 +265,19 @@ export default function StylingPage() {
     const rawAi = (verdict as any)?.aiVerdict ?? (verdict as any)?.body?.aiVerdict ?? null;
     let verdictStatus: string | undefined = rawAi?.verdict;
     let visualNotes: string | undefined = rawAi?.visualNotes;
-    const score = rawAi?.confidence ?? verdict?.score ?? 0;
+    let score = rawAi?.confidence ?? verdict?.score ?? 0;
     const patternClash = rawAi?.patternClash ?? false;
     const colourClash = rawAi?.colourClash ?? false;
+
+    // When reading straight from aiVerdict, confidence is the AI's confidence in
+    // its verdict, not a harmony score — convert it so "% Harmony" agrees with the badge.
+    if (rawAi && verdictStatus) {
+      if (verdictStatus === 'doesnt_work') {
+        score = Math.max(0, 100 - score);
+      } else if (verdictStatus === 'partially_works') {
+        score = Math.min(85, Math.round(score * 0.6));
+      }
+    }
 
     const rawText = verdict?.verdictText || '';
     if (!verdictStatus && rawText) {

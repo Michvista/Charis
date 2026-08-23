@@ -113,11 +113,24 @@ export class VerdictController extends DolphControllerHandler<Dolph> {
       outfit.id,
     );
 
-    if (body.status === "failed") {
+if (body.status === "failed") {
       completedOutfit.fail(body.errorMessage || "Outfit processing failed.");
     } else if (body.aiVerdict) {
+      const confidence = Number(body.aiVerdict.confidence) || 0;
+      // confidence is the AI's confidence in its verdict, not a harmony score.
+      // Derive a harmony % that agrees with the verdict:
+      //  - works            -> harmony = confidence
+      //  - partially_works  -> harmony = ~60% of confidence
+      //  - doesnt_work      -> harmony = 100 - confidence
+      const harmonyScore =
+        body.aiVerdict.verdict === "doesnt_work"
+          ? Math.max(0, 100 - confidence)
+          : body.aiVerdict.verdict === "partially_works"
+            ? Math.min(85, Math.round(confidence * 0.6))
+            : confidence;
+
       completedOutfit.complete({
-        compatibilityScore: Number(body.aiVerdict.confidence) || 0,
+        compatibilityScore: harmonyScore,
         verdictText: `${body.aiVerdict.verdict}: ${body.aiVerdict.visualNotes}`,
       });
     } else if (Array.isArray(body.combos)) {

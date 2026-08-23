@@ -591,10 +591,10 @@ export default function SocialPage() {
                             {isExpanded && (
                               <div className="pt-2 border-t border-[#d9c1c0]/30 flex gap-4 text-xs text-[#544342]">
                                 <button onClick={(e) => { e.stopPropagation(); handleVote(s.id); }} className={`flex items-center gap-1 font-semibold ${likedPosts.has(s.id) ? 'text-red-600' : 'hover:text-[#380208]'}`}>
-                                  \u2665 {s.vote_breakdown?.upvotes || 0} Likes
+                                  ♥ {s.vote_breakdown?.upvotes || 0} Likes
                                 </button>
-                                <span>\u00b7 {s.comment_count || 0} Comments</span>
-                                <span>\u00b7 {s.visibility}</span>
+                                <span>· {s.comment_count || 0} Comments</span>
+                                <span>· {s.visibility}</span>
                               </div>
                             )}
                           </div>
@@ -628,7 +628,7 @@ export default function SocialPage() {
           )}
 
           <footer className="flex justify-between items-center pt-6 border-t border-[#d9c1c0]/50">
-            <span className="text-xs text-[#867272]">\u00a9 2026 CHARIS EDITORIAL. ALL RIGHTS RESERVED.</span>
+            <span className="text-xs text-[#867272]">© 2026 CHARIS EDITORIAL. ALL RIGHTS RESERVED.</span>
             <nav className="flex gap-4 text-xs text-[#867272]">
               <a href="#" className="hover:text-[#380208]">Privacy</a>
               <a href="#" className="hover:text-[#380208]">Terms</a>

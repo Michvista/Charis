@@ -5,11 +5,11 @@ import { AppShell } from '@/components/layout/AppShell';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { useAuth } from '@/lib/context/AuthContext';
 import { useToast } from '@/lib/context/ToastContext';
-import { listSocialFeed, createOutfitShare, addComment, voteShare, createFriendship, listFriendships } from '@/api/social.api';
+import { listSocialFeed, createOutfitShare, updateOutfitShare, deleteOutfitShare, addComment, voteShare, createFriendship, listFriendships } from '@/api/social.api';
 import { fetchProfile } from '@/api/auth.api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { FavouriteIcon, Comment01Icon, Bookmark01Icon, PlusSignIcon, SentIcon, UserAdd01Icon, Search01Icon, Cancel01Icon, Loading01Icon } from '@hugeicons/core-free-icons';
+import { FavouriteIcon, Comment01Icon, Bookmark01Icon, PlusSignIcon, SentIcon, UserAdd01Icon, Search01Icon, Cancel01Icon, Loading01Icon, PencilEdit01Icon, Delete02Icon } from '@hugeicons/core-free-icons';
 import type { OutfitShare, UserProfile } from '@/lib/types';
 import { useOutfits } from '@/lib/context/OutfitsContext';
 import OutfitSnapshotCard from '@/components/outfits/OutfitSnapshotCard';
@@ -36,6 +36,12 @@ export default function SocialPage() {
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
   const [submittingComment, setSubmittingComment] = useState<Record<string, boolean>>({});
+
+  // Edit post state
+  const [editingShare, setEditingShare] = useState<OutfitShare | null>(null);
+  const [editCaption, setEditCaption] = useState('');
+  const [editVisibility, setEditVisibility] = useState<'public' | 'friends' | 'link_only'>('public');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const [selectedOutfitId, setSelectedOutfitId] = useState<string>('');
 
@@ -167,6 +173,44 @@ export default function SocialPage() {
         next.delete(shareId);
         return next;
       });
+    }
+  };
+
+  const handleOpenEdit = (share: OutfitShare) => {
+    setEditingShare(share);
+    setEditCaption(share.caption || '');
+    setEditVisibility(share.visibility || 'public');
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!session?.accessToken || !editingShare) return;
+
+    setSavingEdit(true);
+    try {
+      const updated = await updateOutfitShare(session.accessToken, editingShare.id, {
+        caption: editCaption.trim(),
+        visibility: editVisibility,
+      });
+      setShares((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+      toastSuccess('Post Updated', 'Your look has been updated.');
+      setEditingShare(null);
+    } catch (err) {
+      toastError('Update Failed', err instanceof Error ? err.message : 'Could not update post.');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleDeletePost = async (share: OutfitShare) => {
+    if (!session?.accessToken) return;
+    if (!confirm('Delete this post? This cannot be undone.')) return;
+    try {
+      await deleteOutfitShare(session.accessToken, share.id);
+      setShares((prev) => prev.filter((s) => s.id !== share.id));
+      toastSuccess('Post Deleted', 'Your look has been removed from the community feed.');
+    } catch (err) {
+      toastError('Delete Failed', err instanceof Error ? err.message : 'Could not delete post.');
     }
   };
 
@@ -370,7 +414,7 @@ export default function SocialPage() {
                               </p>
                             </div>
                           </div>
-                          {share.user !== session?.user?.id && (
+                          {share.user !== session?.user?.id ? (
                             <button
                               onClick={() => handleSendFriendRequest(share.user || '', share.user_email || 'Curator')}
                               className={`text-xs font-semibold flex items-center gap-1 transition-colors ${
@@ -382,6 +426,23 @@ export default function SocialPage() {
                               <HugeiconsIcon icon={UserAdd01Icon} size={14} />
                               {requestedFriends.has(share.user || '') ? 'Requested' : 'Connect'}
                             </button>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleOpenEdit(share)}
+                                className="w-8 h-8 rounded-lg grid place-items-center text-[#867272] hover:bg-[#fbf2ed] hover:text-[#380208] transition-colors"
+                                title="Edit post"
+                              >
+                                <HugeiconsIcon icon={PencilEdit01Icon} size={14} />
+                              </button>
+                              <button
+                                onClick={() => handleDeletePost(share)}
+                                className="w-8 h-8 rounded-lg grid place-items-center text-[#867272] hover:bg-red-50 hover:text-red-600 transition-colors"
+                                title="Delete post"
+                              >
+                                <HugeiconsIcon icon={Delete02Icon} size={14} />
+                              </button>
+                            </div>
                           )}
                         </div>
 
@@ -683,6 +744,63 @@ export default function SocialPage() {
                 >
                   {requestedFriends.has(viewingUser.userId) ? '\u2713 Follow Request Sent' : 'Send Follow Request'}
                 </button>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Edit Post Modal */}
+        <AnimatePresence>
+          {editingShare && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white rounded-2xl p-6 md:p-8 max-w-lg w-full shadow-2xl border border-[#d9c1c0] flex flex-col gap-6"
+              >
+                <div className="flex justify-between items-center border-b border-[#d9c1c0]/50 pb-4">
+                  <div>
+                    <span className="eyebrow">Community Feed</span>
+                    <h2 className="serif text-2xl font-bold text-[#1e1b18]">Edit Post</h2>
+                  </div>
+                  <button onClick={() => setEditingShare(null)} className="text-[#867272] hover:text-[#380208]">
+                    <HugeiconsIcon icon={Cancel01Icon} size={20} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveEdit} className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-[#544342]">Caption</label>
+                    <textarea
+                      value={editCaption}
+                      onChange={(e) => setEditCaption(e.target.value)}
+                      rows={3}
+                      className="py-2.5 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208] resize-none"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-[#544342]">Visibility</label>
+                    <select
+                      value={editVisibility}
+                      onChange={(e) => setEditVisibility(e.target.value as any)}
+                      className="py-2 border-b border-[#d9c1c0] bg-white text-sm text-[#1e1b18] outline-none cursor-pointer"
+                    >
+                      <option value="public">Public</option>
+                      <option value="friends">Friends Only</option>
+                      <option value="link_only">Link Only</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={savingEdit}
+                    className="w-full py-3.5 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20 disabled:opacity-50 mt-2"
+                  >
+                    {savingEdit ? 'Saving...' : 'Save Changes →'}
+                  </button>
+                </form>
               </motion.div>
             </div>
           )}

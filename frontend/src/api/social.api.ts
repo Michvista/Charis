@@ -24,6 +24,21 @@ export async function getOutfitShare(token: string, id: string): Promise<OutfitS
   });
 }
 
+export async function updateOutfitShare(token: string, id: string, data: { caption?: string; visibility?: 'public' | 'friends' | 'link_only' }): Promise<OutfitShare> {
+  return requestBackend<OutfitShare>(`/social/shares/${id}/`, {
+    method: 'PATCH',
+    token,
+    body: data,
+  });
+}
+
+export async function deleteOutfitShare(token: string, id: string): Promise<void> {
+  await requestBackend(`/social/shares/${id}/`, {
+    method: 'DELETE',
+    token,
+  });
+}
+
 export async function voteOutfitShare(token: string, shareId: string, value: 1 | -1): Promise<{ vote_count: number; vote_breakdown: { upvotes: number; downvotes: number } }> {
   return requestBackend(`/social/shares/${shareId}/vote/`, {
     method: 'POST',

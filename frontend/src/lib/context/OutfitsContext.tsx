@@ -27,6 +27,45 @@ export function OutfitsProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await listOutfits(session.accessToken);
       setOutfits(Array.isArray(data) ? data : []);
+
+      // One-time migration: import outfits saved in the old localStorage key
+      // (charis.saved_outfits) into the backend so they aren't lost.
+      if (typeof window !== 'undefined') {
+        const legacyRaw = window.localStorage.getItem('charis.saved_outfits');
+        if (legacyRaw) {
+          try {
+            const legacy = JSON.parse(legacyRaw);
+            const existingIds = new Set((Array.isArray(data) ? data : []).map((o) => o.outfit_id));
+            const missing = Array.isArray(legacy)
+              ? legacy.filter((o: any) => o?.outfitId && !existingIds.has(o.outfitId))
+              : [];
+
+            for (const o of missing) {
+              await createOutfit(session.accessToken, {
+                outfit_id: o.outfitId,
+                name: o.name || `Ensemble (${o.score ?? 0}%)`,
+                score: o.score ?? 0,
+                verdict: o.verdict || 'works',
+                visual_notes: o.visualNotes || '',
+                items: (o.items || []).map((i: any) => ({
+                  name: i.name,
+                  image_url: i.image_url,
+                  category: i.category,
+                })),
+              });
+            }
+
+            if (missing.length > 0) {
+              const updated = await listOutfits(session.accessToken);
+              setOutfits(Array.isArray(updated) ? updated : []);
+            }
+            // Only drop the legacy key once everything imported cleanly.
+            window.localStorage.removeItem('charis.saved_outfits');
+          } catch {
+            // Keep the legacy key so the migration retries on the next load.
+          }
+        }
+      }
     } catch {
       setOutfits([]);
     } finally {

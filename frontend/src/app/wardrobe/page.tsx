@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { PlusSignIcon, Cancel01Icon, Delete02Icon, TShirtIcon, Upload01Icon, PencilEdit01Icon, FloppyDiskIcon } from '@hugeicons/core-free-icons';
 import type { WardrobeItem } from '@/lib/types';
+import { CATEGORY_FILTERS, ITEM_CATEGORIES } from '@/lib/constants';
 
 function WearDots({ count }: { count: number }) {
   return (
@@ -24,7 +25,7 @@ function WearDots({ count }: { count: number }) {
   );
 }
 
-const CATEGORIES = ['All', 'top', 'bottom', 'outerwear', 'shoes', 'accessory', 'dress', 'bag'];
+const CATEGORIES = CATEGORY_FILTERS;
 
 export default function WardrobePage() {
   const { session } = useAuth();
@@ -48,6 +49,18 @@ export default function WardrobePage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Bulk add state — multiple images selected at once
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [pendingPreviews, setPendingPreviews] = useState<string[]>([]);
+  const [addedIndexes, setAddedIndexes] = useState<Set<number>>(new Set());
+  const [activeFileIndex, setActiveFileIndex] = useState(0);
+  // Per-image form drafts so each gallery image keeps its own details
+  const [drafts, setDrafts] = useState<
+    Record<number, { name: string; category: string; brand: string; color: string; formality: number; price: string }>
+  >({});
+  // Index of the image currently being curated in a batch run (-1 when idle)
+  const [curatingProgress, setCuratingProgress] = useState(-1);
 
   // Edit Item Modal state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -81,18 +94,126 @@ export default function WardrobePage() {
     fetchItems();
   }, [session]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setFilePreview(URL.createObjectURL(file));
-    }
+  const DEFAULT_DRAFT = { name: '', category: 'top', brand: '', color: 'black', formality: 3, price: '150.00' };
+
+  const loadDraftIntoForm = (idx: number) => {
+    const d = drafts[idx] ?? DEFAULT_DRAFT;
+    setNewItemName(d.name);
+    setNewItemCategory(d.category);
+    setNewItemBrand(d.brand);
+    setNewItemColor(d.color);
+    setNewItemFormality(d.formality);
+    setNewItemPrice(d.price);
+  };
+
+  const saveCurrentDraft = () => {
+    setDrafts((prev) => ({
+      ...prev,
+      [activeFileIndex]: {
+        name: newItemName.trim(),
+        category: newItemCategory,
+        brand: newItemBrand,
+        color: newItemColor,
+        formality: newItemFormality,
+        price: newItemPrice,
+      },
+    }));
+  };
+
+  const handleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const previews = files.map((f) => URL.createObjectURL(f));
+    setPendingFiles(files);
+    setPendingPreviews(previews);
+    setAddedIndexes(new Set());
+    setDrafts({});
+    setActiveFileIndex(0);
+    setSelectedFile(files[0]);
+    setFilePreview(previews[0]);
+    setNewItemName('');
+    // Reset input value so re-selecting the same files still triggers the handler
+    e.target.value = '';
+  };
+
+  const handleSelectGalleryImage = (idx: number) => {
+    saveCurrentDraft();
+    setActiveFileIndex(idx);
+    setSelectedFile(pendingFiles[idx]);
+    setFilePreview(pendingPreviews[idx]);
+    loadDraftIntoForm(idx);
+  };
+
+  const closeAddModal = () => {
+    setShowAddModal(false);
+    setPendingFiles([]);
+    setPendingPreviews([]);
+    setAddedIndexes(new Set());
+    setDrafts({});
+    setActiveFileIndex(0);
+    setSelectedFile(null);
+    setFilePreview('');
+    setNewItemName('');
+    setNewItemBrand('');
+    setNewItemImageUrl('');
+    fetchItems();
   };
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!session?.accessToken || !newItemName.trim()) return;
+    if (!session?.accessToken) return;
 
+    if (pendingFiles.length > 1) {
+      // One click → queue every un-curated image and add them one after another
+      const queue = pendingFiles.map((_, i) => i).filter((i) => !addedIndexes.has(i));
+      if (queue.length === 0) {
+        closeAddModal();
+        return;
+      }
+      saveCurrentDraft();
+      setSubmitting(true);
+      let added = 0;
+      try {
+        for (const idx of queue) {
+          const draft = drafts[idx] ?? DEFAULT_DRAFT;
+          const name =
+            draft.name.trim() ||
+            newItemName.trim() ||
+            (pendingFiles[idx]?.name || '').replace(/\.[^.]+$/, '').trim() ||
+            'Untitled Item';
+          const formData = new FormData();
+          formData.append('name', name);
+          formData.append('category', draft.category || newItemCategory);
+          formData.append('brand', draft.brand.trim() || newItemBrand.trim() || 'Charis Collection');
+          formData.append('primary_color', draft.color || newItemColor);
+          formData.append('formality_level', String(draft.formality || newItemFormality));
+          formData.append('purchase_price', draft.price || newItemPrice);
+          formData.append('purchase_date', new Date().toISOString().split('T')[0]);
+          formData.append('image', pendingFiles[idx]);
+
+          setCuratingProgress(idx);
+          await createWardrobeItem(session.accessToken, formData);
+          added++;
+        }
+        setAddedIndexes(new Set(queue));
+        toastSuccess('Batch Complete', `Curated ${added} item${added !== 1 ? 's' : ''} to your wardrobe.`);
+        closeAddModal();
+      } catch (err) {
+        toastError(
+          'Batch Failed',
+          `${err instanceof Error ? err.message : 'Error adding items'} — ${added} item${added !== 1 ? 's' : ''} added so far.`
+        );
+      } finally {
+        setCuratingProgress(-1);
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // Single item flow
+    if (!newItemName.trim()) return;
+    const file = selectedFile;
     setSubmitting(true);
     try {
       const formData = new FormData();
@@ -104,21 +225,15 @@ export default function WardrobePage() {
       formData.append('purchase_price', newItemPrice);
       formData.append('purchase_date', new Date().toISOString().split('T')[0]);
 
-      if (selectedFile) {
-        formData.append('image', selectedFile);
+      if (file) {
+        formData.append('image', file);
       } else if (newItemImageUrl.trim()) {
         formData.append('image_url', newItemImageUrl.trim());
       }
 
       await createWardrobeItem(session.accessToken, formData);
       toastSuccess('Item Added', `"${newItemName}" has been curated to your wardrobe.`);
-      setShowAddModal(false);
-      setNewItemName('');
-      setNewItemBrand('');
-      setNewItemImageUrl('');
-      setSelectedFile(null);
-      setFilePreview('');
-      fetchItems();
+      closeAddModal();
     } catch (err) {
       toastError('Failed to add item', err instanceof Error ? err.message : 'Error adding wardrobe item.');
     } finally {
@@ -280,8 +395,8 @@ export default function WardrobePage() {
           </div>
 
           {/* Content Grid / Empty State */}
-          <div className="flex gap-6">
-            <div className={`flex-1 ${filteredItems.length ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6' : ''}`}>
+          <div className="flex flex-col lg:flex-row gap-6">
+            <div className={`flex-1 min-w-0 ${filteredItems.length ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6' : ''}`}>
               {loading ? (
                 <div className="col-span-full py-20 flex justify-center items-center">
                   <div className="w-8 h-8 border-2 border-[#380208]/30 border-t-[#380208] rounded-full animate-spin" />
@@ -364,7 +479,7 @@ export default function WardrobePage() {
             <AnimatePresence>
               {selected && (
                 <motion.div
-                  className="w-80 shrink-0 bg-white rounded-2xl border border-[#d9c1c0] p-6 sticky top-6 self-start flex flex-col gap-5 shadow-2xl z-20"
+                  className="w-full lg:w-80 lg:shrink-0 bg-white rounded-2xl border border-[#d9c1c0] p-6 lg:sticky lg:top-6 lg:self-start flex flex-col gap-5 shadow-2xl z-20 max-h-[calc(100vh-3rem)] overflow-y-auto"
                   initial={{ x: 50, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                   exit={{ x: 50, opacity: 0 }}
@@ -472,38 +587,90 @@ export default function WardrobePage() {
                       <span className="eyebrow">Personal Collection</span>
                       <h2 className="serif text-2xl font-bold text-[#1e1b18]">Curate New Item</h2>
                     </div>
-                    <button onClick={() => setShowAddModal(false)} className="text-[#867272] hover:text-[#380208]">
+                    <button onClick={closeAddModal} className="text-[#867272] hover:text-[#380208]">
                       <HugeiconsIcon icon={Cancel01Icon} size={20} />
                     </button>
                   </div>
 
                   <form onSubmit={handleAddItem} className="flex flex-col gap-4">
-                    {/* System Image Upload */}
+                    {/* System Image Upload — supports multiple */}
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-[#544342]">Garment Image (Upload from System)</label>
+                      <label className="text-xs font-semibold text-[#544342]">
+                        Garment Image{pendingFiles.length > 1 ? 's' : ''} (Upload from System)
+                      </label>
                       <div className="relative border-2 border-dashed border-[#d9c1c0] hover:border-[#380208] rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-[#fbf2ed]">
                         <input
                           type="file"
                           accept="image/*"
-                          onChange={handleFileChange}
+                          multiple
+                          onChange={handleFilesChange}
                           className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
                         />
                         {filePreview ? (
                           <div className="relative w-full h-36 rounded-lg overflow-hidden">
                             <img src={filePreview} alt="Preview" className="w-full h-full object-cover" />
                             <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded font-medium">
-                              File Loaded
+                              {pendingFiles.length > 1 ? `Editing ${activeFileIndex + 1} of ${pendingFiles.length}` : 'File Loaded'}
                             </span>
                           </div>
                         ) : (
                           <div className="flex flex-col items-center gap-1.5 py-3 text-[#544342]">
                             <HugeiconsIcon icon={Upload01Icon} size={24} className="text-[#380208]" />
-                            <p className="text-xs font-semibold text-[#1e1b18]">Click or drag image file from your system</p>
-                            <p className="text-[10px] text-[#867272]">PNG, JPG, WEBP — Cloudinary will extract primary color</p>
+                            <p className="text-xs font-semibold text-[#1e1b18]">Click or drag image files from your system</p>
+                            <p className="text-[10px] text-[#867272]">Select one or more images — each becomes its own wardrobe item</p>
                           </div>
                         )}
                       </div>
                     </div>
+
+                    {/* Batch Gallery — pick an image to edit its details */}
+                    {pendingFiles.length > 1 && (
+                      <div className="flex flex-col gap-2">
+                        <div className="flex justify-between items-center">
+                          <span className="eyebrow text-[10px]">
+                            Batch Gallery ({addedIndexes.size}/{pendingFiles.length} curated)
+                          </span>
+                          <span className="text-[10px] text-[#867272]">Click an image to fill in its details</span>
+                        </div>
+                        <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
+                          {pendingFiles.map((_, idx) => {
+                            const isAdded = addedIndexes.has(idx);
+                            const isActive = idx === activeFileIndex;
+                            const isCurating = curatingProgress === idx;
+                            return (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => handleSelectGalleryImage(idx)}
+                                className={`relative w-16 h-20 shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
+                                  isActive
+                                    ? 'border-[#380208] ring-2 ring-[#380208]/25'
+                                    : isAdded
+                                      ? 'border-emerald-400'
+                                      : 'border-[#d9c1c0] opacity-70 hover:opacity-100 hover:border-[#380208]'
+                                }`}
+                                title={pendingFiles[idx]?.name}
+                              >
+                                <img src={pendingPreviews[idx]} alt="" className="w-full h-full object-cover" />
+                                {isCurating && (
+                                  <span className="absolute inset-0 bg-black/30 grid place-items-center">
+                                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                  </span>
+                                )}
+                                {isAdded && (
+                                  <span className="absolute top-1 right-1 w-5 h-5 bg-emerald-600 text-white rounded-full grid place-items-center text-[10px] font-bold shadow">
+                                    ✓
+                                  </span>
+                                )}
+                                {isActive && !isAdded && !isCurating && (
+                                  <span className="absolute inset-0 bg-[#380208]/15" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-semibold text-[#544342]">Item Name *</label>
@@ -525,11 +692,9 @@ export default function WardrobePage() {
                           onChange={(e) => setNewItemCategory(e.target.value)}
                           className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208] cursor-pointer"
                         >
-                          <option value="top">Top</option>
-                          <option value="bottom">Bottom</option>
-                          <option value="outerwear">Outerwear</option>
-                          <option value="shoes">Shoes</option>
-                          <option value="accessory">Accessory</option>
+                          {ITEM_CATEGORIES.map((c) => (
+                            <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                          ))}
                         </select>
                       </div>
 
@@ -597,7 +762,13 @@ export default function WardrobePage() {
                       disabled={submitting}
                       className="w-full py-3.5 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20 disabled:opacity-50 mt-2"
                     >
-                      {submitting ? 'Curating...' : 'Curate Item →'}
+                      {submitting
+                        ? pendingFiles.length > 1
+                          ? `Curating ${Math.max(curatingProgress + 1, 1)}/${pendingFiles.length}...`
+                          : 'Curating...'
+                        : pendingFiles.length > 1
+                          ? `Curate All (${pendingFiles.length - addedIndexes.size}) →`
+                          : 'Curate Item →'}
                     </button>
                   </form>
                 </motion.div>
@@ -677,11 +848,9 @@ export default function WardrobePage() {
                           onChange={(e) => setEditCategory(e.target.value)}
                           className="py-2 border-b border-[#d9c1c0] bg-white text-sm text-[#1e1b18] outline-none cursor-pointer"
                         >
-                          <option value="top">Top</option>
-                          <option value="bottom">Bottom</option>
-                          <option value="outerwear">Outerwear</option>
-                          <option value="shoes">Shoes</option>
-                          <option value="accessory">Accessory</option>
+                          {ITEM_CATEGORIES.map((c) => (
+                            <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                          ))}
                         </select>
                       </div>
                       <div className="flex flex-col gap-1.5">

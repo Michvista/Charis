@@ -17,6 +17,21 @@ export async function createTrip(token: string, data: { name: string; destinatio
   });
 }
 
+export async function updateTrip(token: string, id: string, data: Partial<{ name: string; destination: string; start_date: string; end_date: string; description: string }>): Promise<Trip> {
+  return requestBackend<Trip>(`/tripplanner/trips/${id}/`, {
+    method: 'PATCH',
+    token,
+    body: data as Record<string, unknown>,
+  });
+}
+
+export async function deleteTrip(token: string, id: string): Promise<void> {
+  await requestBackend(`/tripplanner/trips/${id}/`, {
+    method: 'DELETE',
+    token,
+  });
+}
+
 export async function getTrip(token: string, id: string): Promise<Trip> {
   return requestBackend<Trip>(`/tripplanner/trips/${id}/`, {
     method: 'GET',
@@ -36,5 +51,20 @@ export async function createTripEvent(token: string, tripId: string, data: { nam
     method: 'POST',
     token,
     body: data,
+  });
+}
+
+export async function updateTripEvent(token: string, tripId: string, eventId: string, data: Partial<{ name: string; date: string; formality_required: number; location: string; notes: string }>): Promise<TripEvent> {
+  return requestBackend<TripEvent>(`/tripplanner/trips/${tripId}/events/${eventId}/`, {
+    method: 'PATCH',
+    token,
+    body: data as Record<string, unknown>,
+  });
+}
+
+export async function deleteTripEvent(token: string, tripId: string, eventId: string): Promise<void> {
+  await requestBackend(`/tripplanner/trips/${tripId}/events/${eventId}/`, {
+    method: 'DELETE',
+    token,
   });
 }

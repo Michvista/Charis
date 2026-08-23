@@ -5,11 +5,11 @@ import { AppShell } from '@/components/layout/AppShell';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { useAuth } from '@/lib/context/AuthContext';
 import { useToast } from '@/lib/context/ToastContext';
-import { listTrips, createTrip, createTripEvent, generatePackingList } from '@/api/tripplanner.api';
+import { listTrips, createTrip, createTripEvent, generatePackingList, updateTrip, deleteTrip, updateTripEvent, deleteTripEvent } from '@/api/tripplanner.api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Calendar01Icon, Location01Icon, PlusSignIcon, SparklesIcon, Cancel01Icon, Luggage01Icon, CheckmarkCircle02Icon, PackageIcon } from '@hugeicons/core-free-icons';
-import type { Trip } from '@/lib/types';
+import { Calendar01Icon, Location01Icon, PlusSignIcon, SparklesIcon, Cancel01Icon, Luggage01Icon, CheckmarkCircle02Icon, PackageIcon, PencilEdit01Icon, Delete02Icon } from '@hugeicons/core-free-icons';
+import type { Trip, TripEvent } from '@/lib/types';
 
 export default function TripsPage() {
   const { session } = useAuth();
@@ -24,6 +24,8 @@ export default function TripsPage() {
   // Modal States
   const [showTripModal, setShowTripModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
+  const [showEditTripModal, setShowEditTripModal] = useState(false);
+  const [showEditEventModal, setShowEditEventModal] = useState(false);
 
   // New Trip State
   const [tripName, setTripName] = useState('');
@@ -33,6 +35,15 @@ export default function TripsPage() {
   const [tripDesc, setTripDesc] = useState('');
   const [creatingTrip, setCreatingTrip] = useState(false);
 
+  // Edit Trip State
+  const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
+  const [editTripName, setEditTripName] = useState('');
+  const [editTripDestination, setEditTripDestination] = useState('');
+  const [editTripStartDate, setEditTripStartDate] = useState('');
+  const [editTripEndDate, setEditTripEndDate] = useState('');
+  const [editTripDesc, setEditTripDesc] = useState('');
+  const [savingTrip, setSavingTrip] = useState(false);
+
   // New Event State
   const [eventName, setEventName] = useState('');
   const [eventDate, setEventDate] = useState('2026-09-25');
@@ -40,6 +51,15 @@ export default function TripsPage() {
   const [eventLocation, setEventLocation] = useState('');
   const [eventNotes, setEventNotes] = useState('');
   const [creatingEvent, setCreatingEvent] = useState(false);
+
+  // Edit Event State
+  const [editingEvent, setEditingEvent] = useState<TripEvent | null>(null);
+  const [editEventName, setEditEventName] = useState('');
+  const [editEventDate, setEditEventDate] = useState('');
+  const [editEventFormality, setEditEventFormality] = useState(4);
+  const [editEventLocation, setEditEventLocation] = useState('');
+  const [editEventNotes, setEditEventNotes] = useState('');
+  const [savingEvent, setSavingEvent] = useState(false);
 
   useEffect(() => {
     if (!session?.accessToken) return;
@@ -111,6 +131,110 @@ export default function TripsPage() {
     }
   };
 
+  const openEditTrip = (t: Trip) => {
+    setEditingTrip(t);
+    setEditTripName(t.name);
+    setEditTripDestination(t.destination);
+    setEditTripStartDate(t.start_date);
+    setEditTripEndDate(t.end_date);
+    setEditTripDesc(t.description || '');
+    setShowEditTripModal(true);
+  };
+
+  const handleUpdateTrip = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!session?.accessToken || !editingTrip) return;
+
+    setSavingTrip(true);
+    try {
+      const updated = await updateTrip(session.accessToken, editingTrip.id, {
+        name: editTripName.trim(),
+        destination: editTripDestination.trim() || editingTrip.destination,
+        start_date: editTripStartDate,
+        end_date: editTripEndDate,
+        description: editTripDesc.trim(),
+      });
+      setTrips((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      if (selectedTrip?.id === updated.id) setSelectedTrip(updated);
+      toastSuccess('Trip Updated', `"${updated.name}" itinerary updated.`);
+      setShowEditTripModal(false);
+      setEditingTrip(null);
+    } catch (err) {
+      toastError('Failed to update trip', err instanceof Error ? err.message : 'Error updating trip.');
+    } finally {
+      setSavingTrip(false);
+    }
+  };
+
+  const handleDeleteTrip = async (t: Trip) => {
+    if (!session?.accessToken) return;
+    if (!confirm(`Delete "${t.name}" and all of its events?`)) return;
+    try {
+      await deleteTrip(session.accessToken, t.id);
+      setTrips((prev) => prev.filter((x) => x.id !== t.id));
+      if (selectedTrip?.id === t.id) setSelectedTrip(null);
+      toastSuccess('Trip Deleted', `"${t.name}" removed from your itinerary.`);
+    } catch (err) {
+      toastError('Failed to delete trip', err instanceof Error ? err.message : 'Error deleting trip.');
+    }
+  };
+
+  const openEditEvent = (ev: TripEvent) => {
+    setEditingEvent(ev);
+    setEditEventName(ev.name);
+    setEditEventDate(ev.date);
+    setEditEventFormality(ev.formality_required || 4);
+    setEditEventLocation(ev.location || '');
+    setEditEventNotes(ev.notes || '');
+    setShowEditEventModal(true);
+  };
+
+  const handleUpdateEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!session?.accessToken || !selectedTrip || !editingEvent) return;
+
+    setSavingEvent(true);
+    try {
+      const updated = await updateTripEvent(session.accessToken, selectedTrip.id, editingEvent.id, {
+        name: editEventName.trim(),
+        date: editEventDate,
+        formality_required: Number(editEventFormality),
+        location: editEventLocation.trim() || selectedTrip.destination,
+        notes: editEventNotes.trim(),
+      });
+      const updatedTrip = {
+        ...selectedTrip,
+        trip_events: (selectedTrip.trip_events || []).map((ev) => (ev.id === updated.id ? updated : ev)),
+      };
+      setTrips((prev) => prev.map((t) => (t.id === selectedTrip.id ? updatedTrip : t)));
+      setSelectedTrip(updatedTrip);
+      toastSuccess('Event Updated', `"${updated.name}" updated on your itinerary.`);
+      setShowEditEventModal(false);
+      setEditingEvent(null);
+    } catch (err) {
+      toastError('Failed to update event', err instanceof Error ? err.message : 'Error updating event.');
+    } finally {
+      setSavingEvent(false);
+    }
+  };
+
+  const handleDeleteEvent = async (ev: TripEvent) => {
+    if (!session?.accessToken || !selectedTrip) return;
+    if (!confirm(`Delete "${ev.name}" from the itinerary?`)) return;
+    try {
+      await deleteTripEvent(session.accessToken, selectedTrip.id, ev.id);
+      const updatedTrip = {
+        ...selectedTrip,
+        trip_events: (selectedTrip.trip_events || []).filter((x) => x.id !== ev.id),
+      };
+      setTrips((prev) => prev.map((t) => (t.id === selectedTrip.id ? updatedTrip : t)));
+      setSelectedTrip(updatedTrip);
+      toastSuccess('Event Deleted', `"${ev.name}" removed from your itinerary.`);
+    } catch (err) {
+      toastError('Failed to delete event', err instanceof Error ? err.message : 'Error deleting event.');
+    }
+  };
+
   async function handleGeneratePacking(isRecalculate = false) {
     if (!selectedTrip) return;
     if (isRecalculate) setRecalculating(true);
@@ -123,7 +247,7 @@ export default function TripsPage() {
         const updatedTrip = { ...selectedTrip, packing_lists: [list] };
         setSelectedTrip(updatedTrip);
         setTrips((prev) => prev.map((t) => (t.id === selectedTrip.id ? updatedTrip : t)));
-        toastSuccess('Packing List Generated', 'Greedy packing algorithm optimized capsule items for all events.');
+        toastSuccess('Packing List Generated', 'Packing algorithm optimized capsule items for all events.');
       }
     } catch (err) {
       toastError('Packing List Failed', err instanceof Error ? err.message : 'Could not generate packing list.');
@@ -185,10 +309,10 @@ export default function TripsPage() {
             <>
               <div className="flex gap-4 overflow-x-auto pb-2 border-b border-[#d9c1c0]/50">
                 {trips.map((t) => (
-                  <button
+                  <div
                     key={t.id}
                     onClick={() => setSelectedTrip(t)}
-                    className={`p-4 rounded-xl border flex flex-col gap-1 min-w-[220px] transition-all cursor-pointer text-left ${
+                    className={`p-4 rounded-xl border flex flex-col gap-1 min-w-[220px] transition-all cursor-pointer text-left relative group ${
                       selectedTrip?.id === t.id
                         ? 'bg-[#380208] text-white border-[#380208] shadow-md ring-2 ring-[#380208]/20'
                         : 'bg-white text-[#1e1b18] border-[#d9c1c0] hover:border-[#380208]'
@@ -198,13 +322,36 @@ export default function TripsPage() {
                       <span className={`eyebrow ${selectedTrip?.id === t.id ? 'text-amber-200' : 'text-[#867272]'}`}>
                         {t.destination}
                       </span>
-                      <HugeiconsIcon icon={Luggage01Icon} size={14} className={selectedTrip?.id === t.id ? 'text-white' : 'text-[#380208]'} />
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openEditTrip(t); }}
+                          className={`w-6 h-6 rounded-full grid place-items-center transition-colors ${
+                            selectedTrip?.id === t.id
+                              ? 'text-white/80 hover:bg-white/20 hover:text-white'
+                              : 'text-[#867272] hover:bg-[#fbf2ed] hover:text-[#380208]'
+                          }`}
+                          title="Edit trip"
+                        >
+                          <HugeiconsIcon icon={PencilEdit01Icon} size={12} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteTrip(t); }}
+                          className={`w-6 h-6 rounded-full grid place-items-center transition-colors ${
+                            selectedTrip?.id === t.id
+                              ? 'text-white/80 hover:bg-white/20 hover:text-red-300'
+                              : 'text-[#867272] hover:bg-red-50 hover:text-red-600'
+                          }`}
+                          title="Delete trip"
+                        >
+                          <HugeiconsIcon icon={Delete02Icon} size={12} />
+                        </button>
+                      </div>
                     </div>
                     <p className="serif text-lg font-bold truncate">{t.name}</p>
                     <p className={`text-[11px] ${selectedTrip?.id === t.id ? 'text-white/80' : 'text-[#867272]'}`}>
                       {t.start_date} to {t.end_date}
                     </p>
-                  </button>
+                  </div>
                 ))}
               </div>
 
@@ -266,10 +413,28 @@ export default function TripsPage() {
                             <div key={event.id} className="flex gap-6">
                               <div className="w-4 h-4 rounded-full bg-[#380208] shrink-0 mt-2 z-10 ring-4 ring-[#fff8f5]" />
                               <div className="flex-1 flex flex-col gap-3 bg-white rounded-2xl p-6 border border-[#d9c1c0] shadow-sm">
-                                <div>
-                                  <span className="eyebrow text-[10px]">Formality Level {event.formality_required || 4}/5</span>
-                                  <h4 className="serif text-xl font-bold text-[#1e1b18] mt-0.5">{event.name}</h4>
-                                  <p className="text-xs text-[#867272] mt-0.5">{event.date} · {event.location || selectedTrip.destination}</p>
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <span className="eyebrow text-[10px]">Formality Level {event.formality_required || 4}/5</span>
+                                    <h4 className="serif text-xl font-bold text-[#1e1b18] mt-0.5">{event.name}</h4>
+                                    <p className="text-xs text-[#867272] mt-0.5">{event.date} · {event.location || selectedTrip.destination}</p>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                      onClick={() => openEditEvent(event)}
+                                      className="w-7 h-7 rounded-lg grid place-items-center text-[#867272] hover:bg-[#fbf2ed] hover:text-[#380208] transition-colors"
+                                      title="Edit event"
+                                    >
+                                      <HugeiconsIcon icon={PencilEdit01Icon} size={13} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteEvent(event)}
+                                      className="w-7 h-7 rounded-lg grid place-items-center text-[#867272] hover:bg-red-50 hover:text-red-600 transition-colors"
+                                      title="Delete event"
+                                    >
+                                      <HugeiconsIcon icon={Delete02Icon} size={13} />
+                                    </button>
+                                  </div>
                                 </div>
 
                                 {event.notes && <p className="text-xs text-[#544342] leading-relaxed">{event.notes}</p>}
@@ -464,6 +629,106 @@ export default function TripsPage() {
                     </div>
                     <button type="submit" disabled={creatingEvent} className="w-full py-3.5 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all disabled:opacity-50 mt-2">
                       {creatingEvent ? 'Adding...' : 'Add Event →'}
+                    </button>
+                  </form>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* Edit Trip Modal */}
+          <AnimatePresence>
+            {showEditTripModal && editingTrip && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.95, opacity: 0 }}
+                  className="bg-white rounded-2xl p-6 md:p-8 max-w-lg w-full shadow-2xl border border-[#d9c1c0] flex flex-col gap-6"
+                >
+                  <div className="flex justify-between items-center border-b border-[#d9c1c0]/50 pb-4">
+                    <div>
+                      <span className="eyebrow">Trip Planner</span>
+                      <h2 className="serif text-2xl font-bold text-[#1e1b18]">Edit Trip</h2>
+                    </div>
+                    <button onClick={() => setShowEditTripModal(false)} className="text-[#867272] hover:text-[#380208]"><HugeiconsIcon icon={Cancel01Icon} size={20} /></button>
+                  </div>
+
+                  <form onSubmit={handleUpdateTrip} className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-[#544342]">Trip Name *</label>
+                      <input type="text" value={editTripName} onChange={(e) => setEditTripName(e.target.value)} className="py-2.5 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]" required />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-[#544342]">Destination</label>
+                      <input type="text" value={editTripDestination} onChange={(e) => setEditTripDestination(e.target.value)} className="py-2.5 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-[#544342]">Start Date</label>
+                        <input type="date" value={editTripStartDate} onChange={(e) => setEditTripStartDate(e.target.value)} className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]" />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-[#544342]">End Date</label>
+                        <input type="date" value={editTripEndDate} onChange={(e) => setEditTripEndDate(e.target.value)} className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]" />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-[#544342]">Description</label>
+                      <textarea value={editTripDesc} onChange={(e) => setEditTripDesc(e.target.value)} rows={2} className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208] resize-none" />
+                    </div>
+                    <button type="submit" disabled={savingTrip} className="w-full py-3.5 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all disabled:opacity-50 mt-2">
+                      {savingTrip ? 'Saving...' : 'Save Changes →'}
+                    </button>
+                  </form>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* Edit Event Modal */}
+          <AnimatePresence>
+            {showEditEventModal && editingEvent && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.95, opacity: 0 }}
+                  className="bg-white rounded-2xl p-6 md:p-8 max-w-lg w-full shadow-2xl border border-[#d9c1c0] flex flex-col gap-6"
+                >
+                  <div className="flex justify-between items-center border-b border-[#d9c1c0]/50 pb-4">
+                    <div>
+                      <span className="eyebrow">Trip: {selectedTrip?.name}</span>
+                      <h2 className="serif text-2xl font-bold text-[#1e1b18]">Edit Itinerary Event</h2>
+                    </div>
+                    <button onClick={() => setShowEditEventModal(false)} className="text-[#867272] hover:text-[#380208]"><HugeiconsIcon icon={Cancel01Icon} size={20} /></button>
+                  </div>
+
+                  <form onSubmit={handleUpdateEvent} className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-[#544342]">Event Name *</label>
+                      <input type="text" value={editEventName} onChange={(e) => setEditEventName(e.target.value)} className="py-2.5 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]" required />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-[#544342]">Date</label>
+                        <input type="date" value={editEventDate} onChange={(e) => setEditEventDate(e.target.value)} className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]" />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-[#544342]">Formality (1-5)</label>
+                        <input type="number" min="1" max="5" value={editEventFormality} onChange={(e) => setEditEventFormality(Number(e.target.value))} className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]" />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-[#544342]">Location</label>
+                      <input type="text" value={editEventLocation} onChange={(e) => setEditEventLocation(e.target.value)} className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208]" />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-[#544342]">Notes</label>
+                      <textarea value={editEventNotes} onChange={(e) => setEditEventNotes(e.target.value)} rows={2} className="py-2 border-b border-[#d9c1c0] bg-transparent text-sm text-[#1e1b18] outline-none focus:border-[#380208] resize-none" />
+                    </div>
+                    <button type="submit" disabled={savingEvent} className="w-full py-3.5 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all disabled:opacity-50 mt-2">
+                      {savingEvent ? 'Saving...' : 'Save Changes →'}
                     </button>
                   </form>
                 </motion.div>

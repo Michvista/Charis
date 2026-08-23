@@ -21,9 +21,9 @@ import {
   FilterIcon
 } from '@hugeicons/core-free-icons';
 import type { WardrobeItem, Occasion, VerdictResponse, AiVerdict } from '@/lib/types';
+import { CATEGORY_FILTERS as ITEM_CATEGORIES } from '@/lib/constants';
 
 const SEASON_CHIPS = ['Autumn', 'Winter', 'Spring', 'Summer'];
-const ITEM_CATEGORIES = ['All', 'top', 'bottom', 'outerwear', 'shoes', 'accessory', 'dress', 'bag'];
 
 export default function StylingPage() {
   const { session } = useAuth();
@@ -136,6 +136,15 @@ export default function StylingPage() {
       else next.add(id);
       return next;
     });
+  }
+
+  function toggleSelectAll() {
+    const allIds = wardrobeItems.map((i) => i.id);
+    if (selectedItems.size === allIds.length && allIds.length > 0) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(allIds));
+    }
   }
 
   function toggleSeason(s: string) {
@@ -254,11 +263,11 @@ export default function StylingPage() {
   const parsedVerdict = useMemo(() => {
     if (!verdict) return null;
     const rawAi = (verdict as any)?.aiVerdict ?? (verdict as any)?.body?.aiVerdict ?? null;
-    let verdictStatus = rawAi?.verdict;
-    let visualNotes = rawAi?.visualNotes;
-    let score = rawAi?.confidence ?? verdict?.score ?? 0;
-    let patternClash = rawAi?.patternClash ?? false;
-    let colourClash = rawAi?.colourClash ?? false;
+    let verdictStatus: string | undefined = rawAi?.verdict;
+    let visualNotes: string | undefined = rawAi?.visualNotes;
+    const score = rawAi?.confidence ?? verdict?.score ?? 0;
+    const patternClash = rawAi?.patternClash ?? false;
+    const colourClash = rawAi?.colourClash ?? false;
 
     const rawText = verdict?.verdictText || '';
     if (!verdictStatus && rawText) {
@@ -276,8 +285,12 @@ export default function StylingPage() {
       }
     }
 
+    // Only surface a verdict (and its clash flags) when the AI actually returned one —
+    // never invent a "clashes" state for processing/failed/empty verdicts.
+    if (!verdictStatus) return null;
+
     return {
-      verdict: verdictStatus || (score >= 70 ? 'works' : 'doesnt_work'),
+      verdict: verdictStatus,
       visualNotes: visualNotes || 'Outfit composition analyzed.',
       score,
       patternClash,
@@ -420,6 +433,23 @@ export default function StylingPage() {
                     <span className="text-xs font-bold bg-[#380208] text-white px-2 py-0.5 rounded-full">
                       {selectedItems.size} Selected
                     </span>
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-[#544342] cursor-pointer ml-1">
+                      <input
+                        type="checkbox"
+                        checked={wardrobeItems.length > 0 && selectedItems.size === wardrobeItems.length}
+                        onChange={toggleSelectAll}
+                        className="accent-[#380208] w-4 h-4 cursor-pointer"
+                      />
+                      Select All
+                    </label>
+                    {selectedItems.size > 0 && (
+                      <button
+                        onClick={() => setSelectedItems(new Set())}
+                        className="text-xs font-semibold text-[#867272] hover:text-[#380208] transition-colors hover:underline underline-offset-2"
+                      >
+                        Clear
+                      </button>
+                    )}
                   </div>
 
                   <div className="relative flex-1 max-w-xs">
@@ -519,7 +549,15 @@ export default function StylingPage() {
                 </div>
 
                 {/* Visual Notes */}
-                {parsedVerdict?.visualNotes ? (
+                {verdict?.status === 'processing' ? (
+                  <p className="text-sm leading-relaxed text-white/70">
+                    {verdict.verdictText || 'Evaluating garment composition with Gemini Vision...'}
+                  </p>
+                ) : verdict?.status === 'failed' ? (
+                  <p className="text-sm leading-relaxed text-white/70">
+                    {verdict.verdictText || 'AI Verdict processing encountered a worker error. Try again.'}
+                  </p>
+                ) : parsedVerdict?.visualNotes ? (
                   <p className="text-sm leading-relaxed text-white/90">
                     {parsedVerdict.visualNotes}
                   </p>
@@ -529,21 +567,21 @@ export default function StylingPage() {
                   </p>
                 )}
 
-                {/* Clash Indicators */}
-                {parsedVerdict && (
+                {/* Clash Indicators — only when the AI actually flagged a clash */}
+                {(parsedVerdict?.patternClash || parsedVerdict?.colourClash) && (
                   <div className="flex gap-3 flex-wrap">
-                    <div className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${
-                      parsedVerdict.patternClash ? 'bg-red-500/20 text-red-300' : 'bg-white/10 text-white/60'
-                    }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${parsedVerdict.patternClash ? 'bg-red-400' : 'bg-white/40'}`} />
-                      Pattern Clash
-                    </div>
-                    <div className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${
-                      parsedVerdict.colourClash ? 'bg-red-500/20 text-red-300' : 'bg-white/10 text-white/60'
-                    }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${parsedVerdict.colourClash ? 'bg-red-400' : 'bg-white/40'}`} />
-                      Colour Clash
-                    </div>
+                    {parsedVerdict.patternClash && (
+                      <div className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-red-500/20 text-red-300">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                        Pattern Clash
+                      </div>
+                    )}
+                    {parsedVerdict.colourClash && (
+                      <div className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-red-500/20 text-red-300">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                        Colour Clash
+                      </div>
+                    )}
                   </div>
                 )}
 

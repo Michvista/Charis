@@ -51,7 +51,10 @@ export function startTaggingWorker(): Worker<TaggingJobData> {
         const raw = await callGeminiVision(TAGGING_PROMPT, [imageUrl]);
         const parsed = validateTaggingResult(parseGeminiJson(raw));
 
-        await patchStatus("done", parsed);
+        await patchStatus("done", {
+          ...parsed,
+          category: parsed.category.toLowerCase(),
+        });
         console.log(`[wardrobe-tagging] completed job ${job.id} for item ${itemId}`);
       } catch (error) {
         console.error(`[wardrobe-tagging] failed job ${job.id} for item ${itemId}`, error);

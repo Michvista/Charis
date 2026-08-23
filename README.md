@@ -245,15 +245,15 @@ GOOGLE_APPLICATION_CREDENTIALS=
 ## Phases
 
 - [x] Phase 0 — Setup, Docker, DolphJS spike
-- [ ] Phase 1 — Wardrobe context (Django)
-- [ ] Phase 2 — Styling engine + combo algorithm (DolphJS)
-- [ ] Phase 3 — Redis + BullMQ job queue
-- [ ] Phase 4 — Trip planner + greedy packing list
-- [ ] Phase 5 — Social context
-- [ ] Phase 6 — Analytics dashboard (Recharts)
-- [ ] Phase 7 — Complete the look (RAG)
-- [ ] Phase 8 — Frontend (React + Framer Motion)
-- [ ] Phase 9 — Deploy
+- [x] Phase 1 — Wardrobe context (Django)
+- [x] Phase 2 — Styling engine + combo algorithm (DolphJS)
+- [x] Phase 3 — Redis + BullMQ job queue
+- [x] Phase 4 — Trip planner + greedy packing list
+- [x] Phase 5 — Social context
+- [x] Phase 6 — Analytics dashboard (Recharts)
+- [x] Phase 7 — Complete the look (RAG)
+- [x] Phase 8 — Frontend (React + Framer Motion)
+- [x] Phase 9 — Deploy
 
 ---
 

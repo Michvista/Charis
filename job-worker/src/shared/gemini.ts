@@ -127,6 +127,54 @@ async function imageUrlToPart(imageUrl: string): Promise<GeminiImagePart | null>
   return null;
 }
 
+async function generateContentWithRetry(
+  parts: Array<{ text: string } | GeminiImagePart>,
+): Promise<string> {
+  const MAX_ATTEMPTS = 3;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await ai.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: [
+          {
+            role: "user",
+            parts,
+          },
+        ],
+        config: {
+          responseMimeType: "application/json",
+        },
+      });
+
+      if (!response.text) {
+        throw new Error("Gemini returned an empty response");
+      }
+
+      return response.text;
+    } catch (error) {
+      const err = error as { status?: number; code?: string; message?: string };
+      const isTransient =
+        err?.status === 503 ||
+        err?.status === 429 ||
+        err?.code === "ETIMEDOUT" ||
+        err?.code === "ECONNRESET" ||
+        (typeof err?.message === "string" &&
+          /fetch failed|ECONNRESET|ETIMEDOUT/i.test(err.message));
+
+      if (isTransient && attempt < MAX_ATTEMPTS) {
+        const delayMs = 1500 * attempt; // 1.5s, 3s backoff
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw new Error("Gemini request failed after retries");
+}
+
 export async function callGeminiVision(prompt: string, imageUrls: string[]): Promise<string> {
   if (!process.env.GEMINI_API_KEY) {
     throw new Error("GEMINI_API_KEY is not configured");
@@ -156,24 +204,7 @@ export async function callGeminiVision(prompt: string, imageUrls: string[]): Pro
     ...imageParts,
   ];
 
-  const response = await ai.models.generateContent({
-    model: GEMINI_MODEL,
-    contents: [
-      {
-        role: "user",
-        parts,
-      },
-    ],
-    config: {
-      responseMimeType: "application/json",
-    },
-  });
-
-  if (!response.text) {
-    throw new Error("Gemini returned an empty response");
-  }
-
-  return response.text;
+  return generateContentWithRetry(parts);
 }
 
 export function parseGeminiJson<T>(raw: string): T {
@@ -249,8 +280,20 @@ export function validateVerdictResult(raw: unknown): ValidatedGeminiVerdictResul
     throw new Error("Invalid Gemini response: verdict payload must be an object");
   }
 
-  const verdict = raw.verdict;
-  if (verdict !== "works" && verdict !== "doesnt_work" && verdict !== "partially_works") {
+  const VERDICT_ALIASES: Record<string, ValidatedGeminiVerdictResult["verdict"]> = {
+    works: "works",
+    doesnt_work: "doesnt_work",
+    doesntwork: "doesnt_work",
+    "doesnt-work": "doesnt_work",
+    "does not work": "doesnt_work",
+    partially_works: "partially_works",
+    partiallyworks: "partially_works",
+    partial: "partially_works",
+  };
+
+  const rawVerdict = typeof raw.verdict === "string" ? raw.verdict.trim().toLowerCase() : "";
+  const verdict = VERDICT_ALIASES[rawVerdict];
+  if (!verdict) {
     throw new Error("Invalid Gemini response: verdict must be works, doesnt_work, or partially_works");
   }
 

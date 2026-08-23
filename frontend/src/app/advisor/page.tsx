@@ -36,6 +36,11 @@ export default function AdvisorPage() {
   const [loading, setLoading] = useState(false);
   const [occasion, setOccasion] = useState('');
 
+  const ADVISOR_CACHE_PREFIX = 'charis.advisor_cache_';
+  const ADVISOR_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+  const advisorCacheKey = () => `${ADVISOR_CACHE_PREFIX}${session?.user?.id || 'anon'}`;
+
   // Real wardrobe context for RAG
   const [wardrobeItems, setWardrobeItems] = useState<WardrobeItem[]>([]);
   const [occasions, setOccasions] = useState<Occasion[]>([]);
@@ -55,6 +60,27 @@ export default function AdvisorPage() {
       try { setWishlist(JSON.parse(saved)); } catch {}
     }
   }, []);
+
+  // Restore cached advisor suggestions so a closed page doesn't lose results.
+  // Expires after an hour; regenerating replaces it.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(advisorCacheKey());
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (
+          parsed?.savedAt &&
+          Date.now() - parsed.savedAt < ADVISOR_CACHE_TTL_MS &&
+          Array.isArray(parsed.suggestions)
+        ) {
+          setSuggestions(parsed.suggestions);
+        } else {
+          localStorage.removeItem(advisorCacheKey());
+        }
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
 
   // Load real wardrobe + occasions for RAG context
   useEffect(() => {
@@ -109,11 +135,17 @@ export default function AdvisorPage() {
 
       if (res.suggestions?.length) {
         setSuggestions(res.suggestions);
+        localStorage.setItem(
+          advisorCacheKey(),
+          JSON.stringify({ suggestions: res.suggestions, savedAt: Date.now() })
+        );
         toastSuccess('Advisor Refreshed', `${res.suggestions.length} grounded style recommendations generated.`);
       } else {
+        localStorage.removeItem(advisorCacheKey());
         toastError('No Suggestions Returned', 'The Style Advisor returned an empty response. Try rephrasing your occasion.');
       }
     } catch (err) {
+      localStorage.removeItem(advisorCacheKey());
       toastError('Advisor Failed', err instanceof Error ? err.message : 'Style Advisor API returned an error.');
     } finally {
       setLoading(false);

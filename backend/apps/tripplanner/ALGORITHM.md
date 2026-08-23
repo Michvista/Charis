@@ -3,7 +3,10 @@
 This document explains the packing algorithm used by the Charis Django `tripplanner` app.
 
 The current implementation is **not an optimal solver**.
-It is a **greedy packing heuristic** that tries to cover as many trip events as possible with the fewest wardrobe items, while staying within simple season and formality constraints.
+It is a **greedy capsule builder** that assigns a full set of complementary pieces
+(one per garment category) to each scheduled event, then tops up the list with
+casual daywear for the remaining days the trip spans. Items are chosen with a
+formality-distance + season-match scoring heuristic.
 
 ## Where It Lives
 
@@ -16,40 +19,44 @@ It is a **greedy packing heuristic** that tries to cover as many trip events as 
 The trip planner needs to help a user decide:
 
 - which wardrobe items should be packed for a trip
-- which trip events each item can reasonably cover
-- how to avoid overpacking while still covering the trip as well as possible
+- which trip events each item is assigned to cover
+- how to build a practical capsule — not just a bare minimum, but enough
+  complementary pieces to actually dress for each event, plus basics for travel days
 
 The algorithm works with:
 
 - a list of `WardrobeItem` records
 - a list of `TripEvent` records for one trip
-
-It then chooses items that cover the most uncovered events first.
+- the trip itself (to compute how many days need packing)
 
 ## High-Level Idea
 
-Think of each wardrobe item as a candidate tool and each trip event as something that needs to be covered.
+Instead of trying to find the *fewest* items that cover every event, the planner
+builds a **capsule per event**: a formal gala gets a dress + shoes + bag +
+outerwear, a casual hangout gets a top + bottom + shoes, and so on. After every
+event has been fitted, any remaining trip days that are not already covered by a
+piece get filled with casual travel basics.
 
-The algorithm asks:
+Two rules steer the choices:
 
-> "Which single wardrobe item can cover the most trip events that are still uncovered?"
-
-It picks that item, marks those events as covered, removes the item from future consideration, and repeats.
-
-This is a classic greedy coverage strategy.
+1. **Category coverage** — each event is fitted across a set of garment categories
+   (`dress/top/bottom/shoes/bag/outerwear/accessory` for formal events, a smaller
+   set for casual ones), so the result is a real outfit rather than one lone item.
+2. **Fit scoring** — for a given category, the item that matches the event's
+   formality and season the best is chosen.
 
 ## Flow
 
 ```mermaid
 flowchart TD
-    A[Wardrobe items] --> B[Check each item against each trip event]
-    C[Trip events] --> B
-    B --> D[Find the item that covers the most uncovered events]
-    D --> E[Select that item]
-    E --> F[Mark those events covered]
-    F --> G[Remove selected item from remaining candidates]
-    G --> B
-    B --> H[Stop when no uncovered events remain or no items can help]
+    A[Wardrobe items + trip events + trip] --> B[Sort events by formality, most formal first]
+    B --> C[For each event: for each category in the event's priority list]
+    C --> D[Pick the best-scoring unused item of that category]
+    D --> E[Record item as covering this event]
+    E --> C
+    C --> F[Compute trip day count]
+    F --> G[Fill leftover days with casual travel basics]
+    G --> H[Return packed selections]
 ```
 
 ## Data Model Concepts
@@ -84,9 +91,10 @@ A `PackingList` belongs to one trip and stores the selected wardrobe items.
 Each packing list item stores:
 
 - the selected wardrobe item
-- which event IDs it helps cover
+- which event IDs it is assigned to cover
 
 That `covers_event_ids` field is important because it makes the result explainable.
+Travel/daywear pieces have an empty `covers_event_ids` list.
 
 ## The Season Logic
 
@@ -100,91 +108,67 @@ The algorithm uses a month-to-season map:
 This is done with `SEASON_BY_MONTH` in `algorithms.py`.
 
 For each `TripEvent`, the event date is mapped to a season.
-For each `WardrobeItem`, the item's assigned seasons are read from the user's wardrobe data.
+For each `WardrobeItem`, the item's assigned seasons are read from the user's
+wardrobe data.
 
-An item only counts as compatible with an event if the item's seasons include the event season.
+An item whose seasons **do not** include the event season incurs a +5 penalty on
+its fit score (`_item_fit`). An item with **no seasons at all** is treated as
+season-agnostic and gets no penalty — the old "ignore unseasoned items" rule was
+removed because it dropped useful pieces from the result.
 
 ## The Formality Rule
 
-The algorithm also checks formality.
+Fit is scored as:
 
-It allows a wardrobe item to cover an event when:
+```
+fit = abs(item.formality_level - event.formality_required)
+```
 
-- `abs(item.formality_level - event.formality_required) <= 1`
+plus `+5` when the item's seasons exclude the event's season. An item is accepted
+for an event when its total fit score is `<= 6` (small formality drift allowed,
+but never bridging e.g. a casual 1 with a black-tie 5).
 
-That means the item does not have to match the event formality exactly.
-It just needs to be close enough.
+## Selection Strategy
 
-Examples:
+The main function is `greedy_packing_list(wardrobe_items, trip_events, trip=None)`.
 
-- item formality `3`, event formality `3` -> allowed
-- item formality `3`, event formality `4` -> allowed
-- item formality `2`, event formality `4` -> not allowed
+It works in two passes:
 
-This gives the planner some flexibility while still respecting the trip context.
+1. **Per-event capsule**
+   - Sort events by required formality (most formal first).
+   - For each event, walk the category priority list for its formality band
+     (`CATEGORY_PRIORITY_BY_FORMALITY`) and, for each category, pick the unused
+     item of that category with the best fit score (`_pick_for_event`).
+   - Each picked item is recorded with `covers_event_ids=[event.id]` and removed
+     from the candidate pool so no piece is packed twice.
 
-## Coverage Rule
+2. **Travel daywear**
+   - Compute the day count from the trip's start/end dates (falling back to the
+     span of the event dates).
+   - `travel_needed = max(0, day_count - len(selected))`.
+   - Rotate through `top`, `bottom`, `shoes` and pick the lowest-formality unused
+     item of each (`_pick_travel_item`), recording each with an empty
+     `covers_event_ids`.
 
-An item covers an event only if both conditions are true:
+## Determinism
 
-- season match
-- formality match
-
-In code, that logic is in `_item_covers_event()`.
-
-If an item has no seasons at all, it is automatically ignored.
-
-That is a useful safety rule because an item without seasonal metadata is too weak to trust in the packing result.
-
-## Greedy Selection Strategy
-
-The main function is `greedy_packing_list()`.
-
-It works like this:
-
-1. Collect all uncovered event IDs.
-2. Start with all wardrobe items as candidates.
-3. For each remaining item, compute which uncovered events it can cover.
-4. Pick the item that covers the largest number of uncovered events.
-5. Add that item to the result.
-6. Remove the covered events from the uncovered set.
-7. Remove the selected item from future consideration.
-8. Repeat until nothing useful remains.
-
-## Tie-Breaking
-
-Sometimes two items cover the same number of events.
-
-The algorithm then breaks ties deterministically by comparing:
-
-1. item name in lowercase
-2. item UUID as a string
-
-This matters because it keeps the algorithm stable.
-
-If the same input is run twice, the same result should be returned.
-
-That determinism is important for:
-
-- testing
-- debugging
-- repeatable packing outputs
+Choices are deterministic: for a given category and event, `min()` over the fit
+score returns the first best candidate in the stable wardrobe list. Running the
+same input twice yields the same packing list, which matters for testing,
+debugging, and repeatable outputs.
 
 ## Why This Is Greedy
 
-This is greedy because it makes the best local choice at each step.
+This is greedy because at each step it makes the best local choice — the best-fit
+unused item for a category, or the lowest-formality piece for travel days. It
+does **not** search all possible combinations, does not backtrack, and does not
+prove global optimality.
 
-It does **not** search all possible combinations.
-It does **not** backtrack.
-It does **not** prove optimality.
-
-It simply chooses the currently best item based on immediate coverage.
-
-That is often a good engineering tradeoff when:
+That is a reasonable engineering tradeoff because:
 
 - the input set is small or medium
 - the problem needs to run fast
-- a "good enough" packing plan is acceptable
+- a "good enough" capsule is acceptable
 
 ## What It Returns
 
@@ -194,12 +178,17 @@ The function returns a list of selections shaped like:
 [
     {
         "wardrobe_item": <WardrobeItem>,
-        "covers_event_ids": ["event-uuid-1", "event-uuid-2"]
-    }
+        "covers_event_ids": ["event-uuid-1"],
+    },
+    {
+        "wardrobe_item": <WardrobeItem>,
+        "covers_event_ids": [],  # daywear / travel piece
+    },
 ]
 ```
 
-The Django view then saves these selections into a `PackingList` and `PackingListItem` records.
+The Django view saves these selections into a `PackingList` and `PackingListItem`
+records.
 
 ## End-to-End Request Flow
 
@@ -212,28 +201,10 @@ the flow is:
 1. Django loads the trip for the authenticated user.
 2. Django loads that trip's events.
 3. Django loads the user's wardrobe items.
-4. `greedy_packing_list()` evaluates coverage.
+4. `greedy_packing_list()` builds the per-event capsule plus travel daywear.
 5. A `PackingList` record is created.
 6. One `PackingListItem` row is created per chosen item.
 7. The packed list is returned to the client.
-
-## Why It Is Not Optimal
-
-This algorithm is intentionally simple.
-
-It does not guarantee the fewest possible wardrobe items.
-It does not search for the mathematically best outfit subset.
-
-For example, a globally optimal solution might require checking all combinations of items, which becomes expensive very quickly.
-
-Instead, this implementation chooses a practical heuristic:
-
-- simple
-- fast
-- predictable
-- easy to explain
-
-For Charis, that is a sensible product decision for now.
 
 ## Complexity
 
@@ -241,36 +212,26 @@ Let:
 
 - `I` = number of wardrobe items
 - `E` = number of trip events
+- `C` = number of categories tried per event (at most 7)
 
-Each greedy round checks all remaining items against all events.
-
-Roughly speaking, the runtime is on the order of:
-
-- `O(I * E * I)` in the worst case, because each chosen item is removed and we re-scan remaining items
-
-For typical user data, that is acceptable.
-
-If the data size grows significantly, this could be optimized later with:
-
-- precomputed coverage maps
-- cached season/formality buckets
-- candidate pruning
+The per-event pass scans candidate items by category: roughly `O(E * C * I)`.
+The travel pass adds at most `O(I)` more work. For typical user data that is
+acceptable; if data grows, this could be optimized with precomputed category
+buckets and cached season/formality scores.
 
 ## Strengths
 
-- easy to understand
-- deterministic
-- explainable to users
-- fits Django's conventional backend style
-- fast enough for a first production version
+- produces a fuller, usable capsule instead of a bare minimum
+- deterministic and explainable (`covers_event_ids` maps items to events)
+- fast enough for real trips
+- season-agnostic items are still usable (no drop-off for untagged items)
 
 ## Limitations
 
 - not globally optimal
-- depends on season metadata being present
+- does not consider richer styling signals like color harmony, fabric, or weather
 - treats season as month-based, which is a rough approximation
-- uses a simple formality distance rule
-- does not yet consider richer styling signals like color harmony, fabric, or weather
+- category priority is a fixed heuristic, not learned from the user's style
 
 ## Example
 
@@ -278,7 +239,7 @@ Imagine a trip with these events:
 
 - Beach brunch, summer, formality 2
 - Dinner, summer, formality 4
-- Airport travel, summer, formality 1
+- Airport travel day, summer, formality 1
 
 And wardrobe items like:
 
@@ -287,22 +248,15 @@ And wardrobe items like:
 - blazer, summer, formality 4
 - sneakers, summer, formality 1
 
-The algorithm may choose:
-
-1. the shirt because it covers the most events
-2. the trousers because they cover the remaining casual and mid-formality events
-3. the blazer because it covers the dinner event
-
-It is trying to maximize coverage without packing unnecessary duplicates.
+The planner first fits the most formal event (Dinner, formality 4) with a
+category-appropriate set, then the brunch, then fills the remaining travel day
+with casual basics — e.g. the blazer for dinner, the shirt + trousers for brunch,
+and sneakers as the travel-day shoe. Because it assigns multiple complementary
+pieces per event, the result is a real outfit plan rather than a single item.
 
 ## Summary
 
-The trip planner uses a **greedy coverage-based packing heuristic**.
-
-It is not an optimal solver, but it is:
-
-- deterministic
-- easy to reason about
-- practical for production
-
-That makes it a good fit for the current Charis backend.
+The trip planner uses a **greedy capsule-building heuristic**: complementary
+pieces per scheduled event (selected by formality + season fit) plus casual
+daywear for the days the trip spans. It is deterministic, fast, and practical for
+production even though it does not guarantee an optimal solution.

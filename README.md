@@ -231,6 +231,9 @@ INTERNAL_API_KEY=        # shared secret between job-worker and services
 # AI
 GROQ_API_KEY=
 GEMINI_API_KEY=
+# Optional: server-side Gemini File Search corpus resource name (e.g. corpora/charis-style-knowledge).
+# When unset, the Style Advisor creates a corpus once with display name "charis-style-knowledge".
+GEMINI_RAG_CORPUS=
 
 # Cloudinary
 CLOUDINARY_CLOUD_NAME=

@@ -1,8 +1,9 @@
 """Semantic embeddings for style knowledge retrieval.
 
-Uses the Gemini embedding model when a GEMINI_API_KEY is present. If the
-embedding call fails (no key, network, SDK shape changes) it returns None and
-retrieval falls back to keyword/tag scoring, so the feature never hard-fails.
+Uses the Gemini embedding model (google.genai SDK) when a GEMINI_API_KEY is
+present. If the embedding call fails (no key, network, SDK shape changes) it
+returns None and retrieval falls back to keyword/tag scoring, so the feature
+never hard-fails.
 """
 
 from __future__ import annotations
@@ -23,20 +24,11 @@ def generate_embedding(text: str) -> list[float] | None:
     model_name = os.getenv("STYLEADVISOR_EMBEDDING_MODEL", "text-embedding-004")
 
     try:
-        import google.generativeai as genai  # type: ignore
+        from google import genai  # type: ignore
 
-        genai.configure(api_key=api_key)
-
-        # SDK access paths differ across google-generativeai versions.
-        try:
-            result = genai.models.embed_content(model=model_name, content=text)
-        except AttributeError:
-            try:
-                result = genai.embed_content(model=f"models/{model_name}", content=text)
-            except AttributeError:
-                result = genai.embed_content(model=model_name, content=text)
-
-        embedding = _extract_embedding(result)
+        client = genai.Client(api_key=api_key)
+        response = client.models.embed_content(model=model_name, contents=[text])
+        embedding = _extract_embedding(response)
         return [float(value) for value in embedding] if embedding else None
     except Exception:
         return None
@@ -47,15 +39,7 @@ def _extract_embedding(result) -> list[float] | None:
     if result is None:
         return None
 
-    # google-generativeai embed_content -> result.embedding (list of floats)
-    if hasattr(result, "embedding"):
-        embedding = result.embedding
-        if hasattr(embedding, "values"):
-            return list(embedding.values)
-        if isinstance(embedding, (list, tuple)):
-            return list(embedding)
-
-    # google-genai style -> result.embeddings[0].values
+    # google.genai embed_content -> result.embeddings[0].values
     if hasattr(result, "embeddings") and result.embeddings:
         first = result.embeddings[0]
         if hasattr(first, "values"):
@@ -63,7 +47,14 @@ def _extract_embedding(result) -> list[float] | None:
         if hasattr(first, "embedding"):
             return _extract_embedding(first)
 
-    # Plain dict/list shapes
+    # Older response shapes
+    if hasattr(result, "embedding"):
+        embedding = result.embedding
+        if hasattr(embedding, "values"):
+            return list(embedding.values)
+        if isinstance(embedding, (list, tuple)):
+            return list(embedding)
+
     if isinstance(result, dict):
         embedding = result.get("embedding") or result.get("values")
         if isinstance(embedding, (list, tuple)):

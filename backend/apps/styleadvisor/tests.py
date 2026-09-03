@@ -95,7 +95,7 @@ class KnowledgeIngestionTests(TestCase):
             path.unlink(missing_ok=True)
 
     def _run_ingest(self):
-        with patch("apps.styleadvisor.retriever.upload_gemini_file", return_value="file://test"), patch(
+        with patch("apps.styleadvisor.retriever.sync_corpus_document", return_value="corpora/x/documents/y"), patch(
             "apps.styleadvisor.retriever.generate_embedding",
             return_value=[0.1, 0.2, 0.3],
         ):
@@ -155,18 +155,39 @@ class KnowledgeRetrievalTests(TestCase):
             embedding=[],
         )
 
-    def test_retrieval_ranks_relevant_chunk_first(self):
-        with patch("apps.styleadvisor.retriever.generate_embedding", return_value=None):
+    def test_retrieval_uses_file_search_results(self):
+        with patch(
+            "apps.styleadvisor.retriever.query_rag_corpus",
+            return_value=[
+                {"text": "Beach weddings call for linen.", "metadata": {"source_file": "dress_codes.md"}},
+                {"text": "Office wear needs tailoring.", "metadata": {"source_file": "occasion_styling.md"}},
+            ],
+        ):
+            result = retrieve_relevant_chunks("beach wedding", top_k=1)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].source_file, "dress_codes.md")
+
+    def test_retrieval_falls_back_to_local_when_file_search_empty(self):
+        with patch("apps.styleadvisor.retriever.query_rag_corpus", return_value=[]), patch(
+            "apps.styleadvisor.retriever.generate_embedding",
+            return_value=None,
+        ):
             result = retrieve_relevant_chunks("beach wedding", top_k=1)
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].source_file, "dress_codes.md")
 
     def test_retrieval_uses_embeddings_when_available(self):
-        with patch("apps.styleadvisor.retriever.generate_embedding", return_value=[1.0, 0.0, 0.0]):
+        with patch("apps.styleadvisor.retriever.query_rag_corpus", return_value=[]), patch(
+            "apps.styleadvisor.retriever.generate_embedding",
+            return_value=[1.0, 0.0, 0.0],
+        ):
             result = retrieve_relevant_chunks("beach wedding", top_k=1)
         self.assertEqual(len(result), 1)
 
     def test_retrieval_returns_empty_with_no_chunks(self):
         StyleKnowledgeChunk.objects.all().delete()
-        with patch("apps.styleadvisor.retriever.generate_embedding", return_value=None):
+        with patch("apps.styleadvisor.retriever.query_rag_corpus", return_value=[]), patch(
+            "apps.styleadvisor.retriever.generate_embedding",
+            return_value=None,
+        ):
             self.assertEqual(retrieve_relevant_chunks("beach wedding"), [])

@@ -1,0 +1,91 @@
+# Render Blueprint — Charis on free tier.
+#
+# Three web services (Render's free plan has no background workers, so the
+# job-worker runs as a web service with a tiny health endpoint — see
+# job-worker/src/index.ts).
+#
+# Postgres and Redis stay EXTERNAL (e.g. Neon + Upstash). Fill in the `sync: false`
+# env vars in the Render dashboard after the services are created.
+#
+# Replace `repo` with your actual GitHub repository URL if it differs.
+
+services:
+  - type: web
+    name: charis-backend
+    runtime: docker
+    repo: https://github.com/Michvista/Charis
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    startCommand: gunicorn config.wsgi:application -c gunicorn.conf.py
+    envVars:
+      - key: SECRET_KEY
+        sync: false
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        sync: false # e.g. charis-backend.onrender.com,localhost
+      - key: DATABASE_URL
+        sync: false # Neon Postgres URL
+      - key: REDIS_URL
+        sync: false # Upstash / external Redis URL
+      - key: JWT_SECRET
+        sync: false # MUST equal the styling-service JWT_SECRET
+      - key: INTERNAL_API_KEY
+        sync: false # shared secret with worker + styling-service
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: STYLING_SERVICE_URL
+        value: https://charis-styling.onrender.com
+      - key: STYLING_SERVICE_INTERNAL_TOKEN
+        sync: false
+
+  - type: web
+    name: charis-styling
+    runtime: docker
+    repo: https://github.com/Michvista/Charis
+    plan: free
+    dockerfilePath: ./styling-service/Dockerfile
+    dockerContext: ./styling-service
+    startCommand: node app/server.js
+    envVars:
+      - key: DATABASE_URL
+        sync: false # same Postgres, styling_service schema
+      - key: DATABASE_SCHEMA
+        value: styling_service
+      - key: JWT_SECRET
+        sync: false # MUST equal backend JWT_SECRET
+      - key: INTERNAL_API_KEY
+        sync: false
+
+  - type: web
+    name: charis-job-worker
+    runtime: docker
+    repo: https://github.com/Michvista/Charis
+    plan: free
+    dockerfilePath: ./job-worker/Dockerfile
+    dockerContext: ./job-worker
+    startCommand: node dist/index.js
+    envVars:
+      - key: REDIS_URL
+        sync: false # same external Redis as the backend
+      - key: DJANGO_INTERNAL_URL
+        value: https://charis-backend.onrender.com
+      - key: STYLING_SERVICE_INTERNAL_URL
+        value: https://charis-styling.onrender.com
+      - key: STYLING_SERVICE_URL
+        value: https://charis-styling.onrender.com
+      - key: INTERNAL_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: UV_THREADPOOL_SIZE
+        value: "128"

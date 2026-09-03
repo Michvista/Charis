@@ -1,69 +1,133 @@
 from __future__ import annotations
 
-import os
+import logging
+import re
 import tempfile
 from pathlib import Path
 
-from .gemini_client import generate_gemini_text, upload_gemini_file
-from .json_utils import extract_json_array
+from .embeddings import cosine_similarity, generate_embedding
+from .gemini_client import upload_gemini_file
 from .models import StyleKnowledgeChunk
 
+logger = logging.getLogger("styleadvisor")
 
-def upload_knowledge_chunk(content: str, tags: list):
-    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as handle:
-        handle.write(content)
-        temp_path = handle.name
 
+def _upload_content_to_gemini(content: str, previous_ref: str = "") -> str:
+    """Upload ``content`` to Gemini file storage and return the reference."""
+    temp_path: str | None = None
     try:
-        embedding_ref = upload_gemini_file(temp_path)
-        chunk = StyleKnowledgeChunk.objects.create(
-            content=content,
-            tags=tags,
-            embedding_ref=embedding_ref,
-        )
-        return chunk
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as handle:
+            handle.write(content)
+            temp_path = handle.name
+        return upload_gemini_file(temp_path) or previous_ref
+    except Exception:
+        return previous_ref
     finally:
-        try:
-            Path(temp_path).unlink(missing_ok=True)
-        except OSError:
-            pass
+        if temp_path:
+            try:
+                Path(temp_path).unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
+def upload_knowledge_chunk(
+    content: str,
+    tags: list,
+    title: str = "",
+    source_file: str = "",
+    content_hash: str = "",
+):
+    """Persist a knowledge chunk locally and to Gemini file storage.
+
+    ``content_hash`` enables idempotent ingestion: callers compare hashes to
+    skip or update existing records instead of creating duplicates.
+    """
+    embedding_ref = _upload_content_to_gemini(content)
+    embedding = generate_embedding(content) or []
+
+    return StyleKnowledgeChunk.objects.create(
+        title=title,
+        content=content,
+        tags=tags,
+        embedding_ref=embedding_ref,
+        source_file=source_file,
+        content_hash=content_hash,
+        embedding=embedding,
+    )
+
+
+def update_knowledge_chunk(
+    chunk: StyleKnowledgeChunk,
+    content: str,
+    tags: list,
+    title: str = "",
+    source_file: str = "",
+    content_hash: str = "",
+):
+    """Refresh an existing knowledge chunk (content, tags, hash, embedding)."""
+    embedding_ref = _upload_content_to_gemini(content, previous_ref=chunk.embedding_ref)
+    embedding = generate_embedding(content) or []
+
+    chunk.title = title
+    chunk.content = content
+    chunk.tags = tags
+    chunk.embedding_ref = embedding_ref
+    chunk.source_file = source_file
+    chunk.content_hash = content_hash
+    chunk.embedding = embedding
+    chunk.save()
+    return chunk
+
+
+def _keyword_score(query: str, chunk: StyleKnowledgeChunk) -> float:
+    """Simple lexical relevance: how many query terms appear in tags/content."""
+    tokens = {
+        token
+        for token in re.findall(r"[a-z0-9]+", query.lower())
+        if len(token) > 2
+    }
+    if not tokens:
+        return 0.0
+
+    tag_text = " ".join(chunk.tags or []).lower()
+    content_text = (chunk.title or "") + " " + chunk.content
+    content_text = content_text.lower()
+
+    hits = sum(1 for token in tokens if token in tag_text)
+    hits += sum(1 for token in tokens if token in content_text)
+    return float(hits)
 
 
 def retrieve_relevant_chunks(query: str, top_k: int = 5, model_name: str | None = None):
-    chunks = list(StyleKnowledgeChunk.objects.order_by("created_at"))
+    """Semantic retrieval of the most relevant knowledge chunks for ``query``.
 
+    Rank chunks by Gemini embedding cosine similarity, boosted by lexical
+    tag/content overlap. Falls back to pure lexical scoring when embeddings are
+    unavailable so retrieval always works (and is unit-testable offline).
+    """
+    chunks = list(StyleKnowledgeChunk.objects.order_by("created_at"))
     if not chunks:
         return []
 
-    prompt_lines = [
-        f"Given this styling query: {query}",
-        f"Which of these style rules are most relevant?",
-        f"Return ONLY the indices of the top {top_k} most relevant rules as a JSON array e.g. [0,2,4]",
-        "",
-    ]
+    query_embedding = generate_embedding(query)
 
-    for index, chunk in enumerate(chunks):
-        prompt_lines.append(f"[{index}] tags={chunk.tags} content={chunk.content}")
+    scored: list[tuple[float, StyleKnowledgeChunk]] = []
+    for chunk in chunks:
+        semantic = (
+            cosine_similarity(query_embedding, chunk.embedding)
+            if query_embedding and chunk.embedding
+            else 0.0
+        )
+        lexical = _keyword_score(query, chunk)
+        score = semantic + (lexical * 0.2)
+        scored.append((score, chunk))
 
-    selected_model = model_name or os.getenv(
-        "STYLEADVISOR_RETRIEVER_MODEL",
-        os.getenv("STYLEADVISOR_MODEL", "gemini-2.5-flash"),
-    )
-    raw_text = generate_gemini_text(selected_model, "\n".join(prompt_lines))
+    scored.sort(key=lambda item: item[0], reverse=True)
 
-    try:
-        indices = [int(value) for value in extract_json_array(raw_text)]
-    except Exception:
-        indices = list(range(min(top_k, len(chunks))))
-
-    selected: list[StyleKnowledgeChunk] = []
-    for index in indices:
-        if 0 <= index < len(chunks) and chunks[index] not in selected:
-            selected.append(chunks[index])
-        if len(selected) >= top_k:
-            break
-
+    selected = [chunk for score, chunk in scored[:top_k] if score > 0]
     if not selected:
         selected = chunks[:top_k]
 
+    logger.info("Query: %s", query)
+    logger.info("Retrieved: %s", ", ".join(chunk.source_file or chunk.title or chunk.content[:40] for chunk in selected))
     return selected

@@ -115,6 +115,7 @@ charis/
 │       ├── social/                 # OutfitShare, Comment, Vote
 │       ├── analytics/              # Aggregations (no new models)
 │       ├── styleadvisor/           # RAG: StyleKnowledgeChunk, ShoppingSuggestion
+│       ├── knowledge/              # curated fashion knowledge (*.md, ingested via command)
 │       └── outfits/                # Outfit (saved outfit snapshots, CRUD)
 ├── styling-service/                # DolphJS (Clean Architecture)
 │   ├── src/

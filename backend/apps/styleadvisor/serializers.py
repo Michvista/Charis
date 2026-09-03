@@ -6,8 +6,18 @@ from .models import ShoppingSuggestion, StyleKnowledgeChunk
 class StyleKnowledgeChunkSerializer(serializers.ModelSerializer):
     class Meta:
         model = StyleKnowledgeChunk
-        fields = ["id", "content", "tags", "embedding_ref", "created_at", "updated_at"]
-        read_only_fields = ["id", "embedding_ref", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "title",
+            "content",
+            "tags",
+            "embedding_ref",
+            "source_file",
+            "content_hash",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "embedding_ref", "source_file", "content_hash", "created_at", "updated_at"]
 
 
 class ShoppingSuggestionSerializer(serializers.ModelSerializer):

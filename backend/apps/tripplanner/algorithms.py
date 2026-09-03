@@ -55,7 +55,7 @@ def _item_seasons(item: WardrobeItem) -> set[str]:
 
 def _item_fit(item: WardrobeItem, target_formality: int, event: Optional[TripEvent] = None) -> int:
     """Lower is a better match. Formality distance dominates, season mismatch adds a penalty."""
-    formality_dist = abs((item.formality_level or 0) - target_formality)
+    formality_dist = abs((item.formality_level or 0) - target_formality) # 1
     penalty = 0
     if event is not None:
         seasons = _item_seasons(item)
@@ -77,7 +77,7 @@ def _pick_for_event(
     ]
     if not candidates:
         return None
-    best = min(
+    best = min(  
         candidates,
         key=lambda it: _item_fit(it, event.formality_required or 3, event),
     )
@@ -133,9 +133,9 @@ def greedy_packing_list(
             )
             used_ids.add(item.id)
 
-    # 2. Add daywear/travel pieces to cover the days the trip spans beyond the events.
-    if trip is not None and trip.start_date and trip.end_date:
-        day_count = (trip.end_date - trip.start_date).days + 1
+    # 2. Add daywear/travel pieces to cover the days the trip spans beyond the events. 
+    if trip is not None and trip.start_date and trip.end_date: 
+        day_count = (trip.end_date - trip.start_date).days + 1 
     elif trip_events:
         dates = sorted(e.date for e in trip_events)
         day_count = (dates[-1] - dates[0]).days + 1
@@ -145,7 +145,7 @@ def greedy_packing_list(
     travel_needed = max(0, day_count - len(selected))
     category_idx = 0
     for _ in range(travel_needed):
-        category = TRAVEL_CATEGORIES[category_idx % len(TRAVEL_CATEGORIES)]
+        category = TRAVEL_CATEGORIES[category_idx % len(TRAVEL_CATEGORIES)] 
         category_idx += 1
         item = _pick_travel_item(wardrobe_items, used_ids, category)
         if item is None:

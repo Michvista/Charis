@@ -34,19 +34,34 @@ class StyleAdvisorService:
     def _build_prompt(self, occasion_description: str, occasion_formality: int, current_item_descriptions: list[str]) -> str:
         chunks = retrieve_relevant_chunks(
             occasion_description,
+            top_k=5,
             model_name=self.retriever_model_name,
         )
-        chunk_text = "\n".join(
-            f"- {chunk.content} [tags: {chunk.tags}]"
-            for chunk in chunks
-        )
+        knowledge_blocks = []
+        for chunk in chunks:
+            title = chunk.title or chunk.source_file or "Style knowledge"
+            tags = ", ".join(chunk.tags or [])
+            header = f"### {title}" + (f" [tags: {tags}]" if tags else "")
+            knowledge_blocks.append(f"{header}\n{chunk.content}")
+        knowledge_text = "\n\n".join(knowledge_blocks) if knowledge_blocks else "(no knowledge retrieved)"
+
+        owned = ", ".join(current_item_descriptions) if current_item_descriptions else "(none provided)"
 
         return (
-            "You are a fashion stylist. The user is attending:\n"
-            f"{occasion_description} (formality {occasion_formality}/5).\n"
-            f"They currently have: {', '.join(current_item_descriptions)}.\n\n"
-            f"Relevant style rules:\n{chunk_text}\n\n"
-            "What items are they missing to complete this look?\n"
+            "You are a fashion stylist. Help the user complete a look for their occasion.\n\n"
+            "## User request / occasion\n"
+            f"{occasion_description} (formality {occasion_formality}/5)\n\n"
+            "## User's current wardrobe items\n"
+            f"{owned}\n\n"
+            "## Relevant fashion knowledge (use this as grounding)\n"
+            f"{knowledge_text}\n\n"
+            "## Instructions\n"
+            "- Base your advice on the retrieved knowledge; do not blindly repeat it and do not dump it verbatim.\n"
+            "- Do not invent facts when the knowledge base already provides the answer.\n"
+            "- Consider the user's actual wardrobe items and the occasion's formality.\n"
+            "- Clearly distinguish what the user already owns, what is missing, and what you recommend.\n"
+            "- Do not recommend an item the user already owns unless there is a specific reason to.\n"
+            "- Prioritize missing pieces that complete the look for this specific occasion.\n\n"
             "Return ONLY valid JSON:\n"
             "{\n"
             "  \"suggestions\": [\n"

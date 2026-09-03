@@ -69,10 +69,13 @@ backend/
     ├── analytics/       # no new models (reads WearLog + WardrobeItem)
     │   └── aggregations.py  # sliding window, frequency, cost-per-wear
     ├── styleadvisor/    # StyleKnowledgeChunk, ShoppingSuggestion
-    │   └── retriever.py # RAG query logic (Google File Store)
+    │   ├── retriever.py # semantic retrieval (embeddings + tag/keyword fallback)
+    │   └── ingestion.py # idempotent ingest of backend/knowledge/*.md
     └── outfits/         # Outfit (saved outfit snapshots) — CRUD via /api/outfits/
         └── models.py    # JSON-snapshot items so social cards render for any viewer
 ```
+
+`backend/knowledge/*.md` holds the curated fashion knowledge (dress codes, fabrics, color theory, seasonal dressing, occasions, coordination, footwear, accessories, fit). Ingest it with `python manage.py ingest_style_knowledge` (idempotent by `source_file` + content hash; `--force` re-uploads).
 
 ### `styling-service/` — Clean Architecture (DolphJS Spring OOP)
 DolphJS Spring mode = OOP controllers + TypeScript decorators. The codebase is layered into application (use-cases), domain (entities + domain services), infrastructure (database + queue), and presentation (HTTP controllers/components).

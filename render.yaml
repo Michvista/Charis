@@ -60,6 +60,8 @@ services:
         sync: false # same Postgres, styling_service schema
       - key: DATABASE_SCHEMA
         value: styling_service
+      - key: REDIS_URL
+        sync: false # same external Redis — styling-service publishes BullMQ jobs to it
       - key: JWT_SECRET
         sync: false # MUST equal backend JWT_SECRET
       - key: INTERNAL_API_KEY

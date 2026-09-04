@@ -4,6 +4,70 @@ from typing import Any
 from django.conf import settings
 
 
+def _is_background_like(hex_color: str) -> bool:
+    """Heuristic: very light/white, very dark/black, or low-saturation grays are
+    usually photo backdrops rather than the garment."""
+    normalized = hex_color.strip().lower()
+    if normalized.startswith("#") and len(normalized) == 9:
+        normalized = normalized[:7]
+    if not (normalized.startswith("#") and len(normalized) == 7):
+        return False
+
+    try:
+        r, g, b = (int(normalized[i : i + 2], 16) for i in (1, 3, 5))
+    except ValueError:
+        return False
+
+    maximum, minimum = max(r, g, b), min(r, g, b)
+    saturation = 0.0 if maximum == 0 else (maximum - minimum) / maximum
+    brightness = (maximum + minimum) / 2 / 255
+
+    if brightness > 0.9 and saturation < 0.15:  # near-white backdrop
+        return True
+    if brightness < 0.08:  # near-black backdrop
+        return True
+    if saturation < 0.08:  # flat gray backdrop
+        return True
+    return False
+
+
+def _extract_garment_color(response: dict[str, Any]) -> str | None:
+    """Pick the most dominant palette color that isn't a background.
+
+    Cloudinary sorts ``colors`` by dominance, so the #1 color is often a white,
+    black, or gray studio backdrop. We walk the palette and return the highest-
+    percentage color that is not background-like, falling back to the top color
+    when everything looks neutral (e.g. a white garment on a white backdrop).
+    """
+    colors = response.get("colors")
+    if not isinstance(colors, list) or not colors:
+        return None
+
+    candidates: list[tuple[str, float]] = []
+    for entry in colors:
+        if not isinstance(entry, (list, tuple)) or len(entry) < 2:
+            continue
+        hex_color = str(entry[0]).strip().lower()
+        if hex_color.startswith("#") and len(hex_color) == 9:
+            hex_color = hex_color[:7]
+        if not (hex_color.startswith("#") and len(hex_color) == 7):
+            continue
+        try:
+            percentage = float(entry[1])
+        except (TypeError, ValueError):
+            percentage = 0.0
+        candidates.append((hex_color, percentage))
+
+    if not candidates:
+        return None
+
+    for hex_color, _percentage in candidates:
+        if not _is_background_like(hex_color):
+            return hex_color
+
+    return candidates[0][0]
+
+
 def _extract_primary_color(response: dict[str, Any]) -> str | None:
     """Normalize Cloudinary's dominant color response into a 6-digit hex string."""
     colors = response.get("colors")
@@ -37,13 +101,17 @@ def _extract_primary_color(response: dict[str, Any]) -> str | None:
 
 
 def upload_image_to_cloudinary(source: Any) -> dict[str, str]:
-    """Upload an image file or URL to Cloudinary and return the hosted URL plus dominant color."""
+    """Upload an image file or URL to Cloudinary and return the hosted URL plus garment color."""
     response = cloudinary.uploader.upload(source, folder="charis/wardrobe", colors=True)
     secure_url = response.get("secure_url")
     if not secure_url:
         raise ValueError("Cloudinary upload did not return a secure_url")
 
-    primary_color = _extract_primary_color(response) or "#808080"
+    primary_color = (
+        _extract_garment_color(response)
+        or _extract_primary_color(response)
+        or "#808080"
+    )
 
     return {
         "secure_url": secure_url,

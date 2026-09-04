@@ -43,7 +43,7 @@ class StyleCompleteView(APIView):
         serializer.is_valid(raise_exception=True)
         try:
             data = serializer.validated_data
-            saved_suggestions = style_advisor_service.generate_shopping_suggestions(
+            result = style_advisor_service.generate_shopping_suggestions(
                 request.user,
                 StyleAdvisorInput(
                     occasion_description=data["occasion_description"],
@@ -54,7 +54,8 @@ class StyleCompleteView(APIView):
             )
             return Response(
                 {
-                    "suggestions": ShoppingSuggestionSerializer(saved_suggestions, many=True).data,
+                    "suggestions": ShoppingSuggestionSerializer(result.suggestions, many=True).data,
+                    "summary": result.summary,
                 },
                 status=status.HTTP_201_CREATED,
             )

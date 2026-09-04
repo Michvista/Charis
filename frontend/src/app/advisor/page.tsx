@@ -33,7 +33,9 @@ export default function AdvisorPage() {
   const { toastSuccess, toastError } = useToast();
 
   const [suggestions, setSuggestions] = useState<StyleAdvisorSuggestion[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [summary, setSummary] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [asking, setAsking] = useState(false);
   const [occasion, setOccasion] = useState('');
 
   const ADVISOR_CACHE_PREFIX = 'charis.advisor_cache_';
@@ -74,6 +76,7 @@ export default function AdvisorPage() {
           Array.isArray(parsed.suggestions)
         ) {
           setSuggestions(parsed.suggestions);
+          setSummary(parsed.summary || '');
         } else {
           localStorage.removeItem(advisorCacheKey());
         }
@@ -109,12 +112,14 @@ export default function AdvisorPage() {
     }
   };
 
-  async function handleRefresh() {
+  async function consultAdvisor(mode: 'refresh' | 'ask') {
+    if (refreshing || asking) return;
     if (!session?.accessToken) {
       toastError('Not Authenticated', 'Please sign in to use the Style Advisor.');
       return;
     }
-    setLoading(true);
+    if (mode === 'refresh') setRefreshing(true);
+    else setAsking(true);
     try {
       // Build real wardrobe context descriptions from actual items
       const itemDescriptions = wardrobeItems
@@ -135,20 +140,26 @@ export default function AdvisorPage() {
 
       if (res.suggestions?.length) {
         setSuggestions(res.suggestions);
+        setSummary(res.summary || '');
         localStorage.setItem(
           advisorCacheKey(),
-          JSON.stringify({ suggestions: res.suggestions, savedAt: Date.now() })
+          JSON.stringify({ suggestions: res.suggestions, summary: res.summary || '', savedAt: Date.now() })
         );
         toastSuccess('Advisor Refreshed', `${res.suggestions.length} grounded style recommendations generated.`);
       } else {
         localStorage.removeItem(advisorCacheKey());
+        setSuggestions([]);
+        setSummary('');
         toastError('No Suggestions Returned', 'The Style Advisor returned an empty response. Try rephrasing your occasion.');
       }
     } catch (err) {
       localStorage.removeItem(advisorCacheKey());
+      setSuggestions([]);
+      setSummary('');
       toastError('Advisor Failed', err instanceof Error ? err.message : 'Style Advisor API returned an error.');
     } finally {
-      setLoading(false);
+      setRefreshing(false);
+      setAsking(false);
     }
   }
 
@@ -217,11 +228,11 @@ export default function AdvisorPage() {
 
               <button
                 className="flex items-center gap-2 px-5 py-3 bg-[#380208] text-white rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#54161b] transition-all shadow-md shadow-[#380208]/20 disabled:opacity-60"
-                onClick={handleRefresh}
-                disabled={loading || loadingContext}
+                onClick={() => consultAdvisor('refresh')}
+                disabled={refreshing || asking || loadingContext}
               >
-                <HugeiconsIcon icon={RefreshIcon} size={14} className={loading ? 'animate-spin' : ''} />
-                {loading ? 'Consulting Advisor...' : 'Refresh AI Suggestions'}
+                <HugeiconsIcon icon={RefreshIcon} size={14} className={refreshing ? 'animate-spin' : ''} />
+                {refreshing ? 'Consulting Advisor...' : 'Refresh AI Suggestions'}
               </button>
             </div>
           </div>
@@ -230,11 +241,11 @@ export default function AdvisorPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-4 bg-white rounded-2xl border border-[#d9c1c0] shadow-sm">
             <HugeiconsIcon icon={InformationCircleIcon} size={18} className="text-[#380208] shrink-0 mt-0.5" />
             <div className="flex-1 text-xs text-[#544342]">
-              <span className="font-semibold text-[#1e1b18]">Wardrobe-Grounded RAG: </span>
-              The advisor reads your{' '}
+              <span className="font-semibold text-[#1e1b18]">RAG-powered Style Advisor: </span>
+              The advisor retrieves curated fashion knowledge from the Charis knowledge base and uses your{' '}
               <span className="font-bold text-[#380208]">{wardrobeItems.length} garments</span> and{' '}
-              <span className="font-bold text-[#380208]">{occasions.length} occasions</span> from your library to generate
-              contextual styling gaps and recommendations — not generic advice.
+              <span className="font-bold text-[#380208]">{occasions.length} occasions</span> as personal
+              context to generate contextual styling gaps and recommendations — not generic advice.
               {wardrobeItems.length === 0 && (
                 <span className="text-amber-700 font-semibold"> Add items to your wardrobe library first for personalized results.</span>
               )}
@@ -251,16 +262,16 @@ export default function AdvisorPage() {
               placeholder="e.g. Formal dinner with gallery opening styling constraints"
             />
             <button
-              onClick={handleRefresh}
-              disabled={loading}
+              onClick={() => consultAdvisor('ask')}
+              disabled={asking || refreshing}
               className="px-4 py-2 bg-[#fbf2ed] text-[#380208] rounded-lg text-xs font-semibold uppercase tracking-wider hover:bg-[#380208] hover:text-white transition-all disabled:opacity-50"
             >
-              {loading ? <HugeiconsIcon icon={Loading01Icon} size={14} className="animate-spin" /> : 'Ask AI →'}
+              {asking ? <HugeiconsIcon icon={Loading01Icon} size={14} className="animate-spin" /> : 'Ask AI →'}
             </button>
           </div>
 
           {/* Empty / Loading State */}
-          {suggestions.length === 0 && !loading && (
+          {suggestions.length === 0 && !refreshing && !asking && (
             <div className="py-12 text-center bg-white/60 border border-dashed border-[#d9c1c0] rounded-2xl flex flex-col items-center gap-3">
               <HugeiconsIcon icon={SparklesIcon} size={36} className="text-[#d9c1c0]" />
               <p className="serif text-xl font-semibold text-[#1e1b18]">No recommendations yet</p>
@@ -270,14 +281,21 @@ export default function AdvisorPage() {
             </div>
           )}
 
-          {loading && (
+          {(refreshing || asking) && (
             <div className="py-12 flex flex-col items-center gap-4">
               <div className="w-10 h-10 border-2 border-[#380208]/30 border-t-[#380208] rounded-full animate-spin" />
-              <p className="text-sm text-[#544342] font-medium">Consulting RAG advisor with your {wardrobeItems.length} wardrobe items...</p>
+              <p className="text-sm text-[#544342] font-medium">Retrieving fashion knowledge and consulting the Style Advisor with your {wardrobeItems.length} wardrobe items...</p>
             </div>
           )}
 
           {/* Suggestions Grid */}
+          {summary && (
+            <div className="bg-[#380208] text-white rounded-2xl p-6 shadow-xl border border-[#380208]/20 flex flex-col gap-3">
+              <span className="eyebrow text-amber-200">Stylist's Overview</span>
+              <p className="text-sm leading-relaxed text-white">{summary}</p>
+            </div>
+          )}
+
           {suggestions.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {suggestions.map((s, i) => {

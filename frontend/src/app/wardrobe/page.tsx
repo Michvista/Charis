@@ -535,7 +535,7 @@ export default function WardrobePage() {
                           style={{ background: selected.primary_color }}
                         />
                         <div>
-                          <span className="eyebrow text-[10px]">Primary Color (Cloudinary Extracted)</span>
+                          <span className="eyebrow text-[10px]">Primary Color</span>
                           <p className="font-semibold text-[#1e1b18] mt-0.5">{selected.primary_color}</p>
                         </div>
                       </div>

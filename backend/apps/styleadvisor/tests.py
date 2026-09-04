@@ -57,20 +57,22 @@ class StyleAdvisorServiceTests(TestCase):
             "apps.styleadvisor.services.generate_gemini_text",
             return_value=json.dumps(
                 {
+                    "summary": "A light, airy look is needed.",
                     "suggestions": [
                         {
                             "item_description": "tan loafers",
                             "reason": "They balance the relaxed outfit.",
                             "priority": "medium",
                         }
-                    ]
+                    ],
                 }
             ),
         ):
-            saved = service.generate_shopping_suggestions(self.user, input_data)
+            result = service.generate_shopping_suggestions(self.user, input_data)
 
-        self.assertEqual(len(saved), 1)
-        self.assertEqual(saved[0].item_description, "tan loafers")
+        self.assertEqual(len(result.suggestions), 1)
+        self.assertEqual(result.suggestions[0].item_description, "tan loafers")
+        self.assertEqual(result.summary, "A light, airy look is needed.")
         self.assertEqual(ShoppingSuggestion.objects.count(), 1)
 
 

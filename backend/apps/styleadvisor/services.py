@@ -19,6 +19,12 @@ class StyleAdvisorInput:
     occasion_id: str | None = None
 
 
+@dataclass(frozen=True)
+class StyleAdvisorResult:
+    suggestions: list[ShoppingSuggestion]
+    summary: str
+
+
 class StyleAdvisorService:
     def __init__(
         self,
@@ -62,8 +68,17 @@ class StyleAdvisorService:
             "- Clearly distinguish what the user already owns, what is missing, and what you recommend.\n"
             "- Do not recommend an item the user already owns unless there is a specific reason to.\n"
             "- Prioritize missing pieces that complete the look for this specific occasion.\n\n"
+            "## Response depth\n"
+            "- Write a rich, helpful response — this is a personal styling consultation, not a bullet list.\n"
+            "- `summary`: 3-5 sentences that assess the occasion and formality, summarize what the user "
+            "already owns and whether it fits, and describe the overall gap the suggestions will fill.\n"
+            "- For every suggestion, write a `reason` of 2-4 sentences: name which owned items fall short "
+            "and why (formality, fabric, color, or season), tie the recommendation to the relevant fashion "
+            "knowledge, and explain how the piece completes the look.\n"
+            "- Provide 3-6 suggestions ranked by priority.\n\n"
             "Return ONLY valid JSON:\n"
             "{\n"
+            "  \"summary\": \"str\",\n"
             "  \"suggestions\": [\n"
             "    {\n"
             "      \"item_description\": \"str\",\n"
@@ -78,7 +93,7 @@ class StyleAdvisorService:
         self,
         user,
         input_data: StyleAdvisorInput,
-    ) -> list[ShoppingSuggestion]:
+    ) -> StyleAdvisorResult:
         prompt = self._build_prompt(
             input_data.occasion_description,
             input_data.occasion_formality,
@@ -111,4 +126,5 @@ class StyleAdvisorService:
                 )
                 saved_suggestions.append(saved)
 
-        return saved_suggestions
+        summary = str(payload.get("summary", "")).strip()
+        return StyleAdvisorResult(suggestions=saved_suggestions, summary=summary)

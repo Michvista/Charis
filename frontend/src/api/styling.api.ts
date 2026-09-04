@@ -55,8 +55,8 @@ export async function fetchVerdict(token: string, outfitId: string): Promise<Ver
   });
 }
 
-export async function completeStyleAdvisor(token: string, data: { occasion_description: string; occasion_formality?: number; current_item_descriptions?: string[]; occasion_id?: string }): Promise<{ suggestions: StyleAdvisorSuggestion[]; summary?: string }> {
-  return requestBackend<{ suggestions: StyleAdvisorSuggestion[]; summary?: string }>('/styleadvisor/complete/', {
+export async function completeStyleAdvisor(token: string, data: { occasion_description: string; occasion_formality?: number; current_item_descriptions?: string[]; occasion_id?: string }): Promise<{ suggestions: StyleAdvisorSuggestion[]; summary?: string; source_files?: string[]; retrieval?: string }> {
+  return requestBackend<{ suggestions: StyleAdvisorSuggestion[]; summary?: string; source_files?: string[]; retrieval?: string }>('/styleadvisor/complete/', {
     method: 'POST',
     token,
     body: data,

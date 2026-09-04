@@ -41,38 +41,83 @@ class StyleAdvisorServiceTests(TestCase):
             tags=["summer", "linen"],
         )
 
-    def test_generate_shopping_suggestions_persists_results(self):
-        service = StyleAdvisorService(model_name="gemini-2.5-flash")
-        input_data = StyleAdvisorInput(
+    def _input(self):
+        return StyleAdvisorInput(
             occasion_description="Beach wedding",
             occasion_formality=3,
             current_item_descriptions=["white linen shirt"],
             occasion_id="550e8400-e29b-41d4-a716-446655440000",
         )
 
+    def _gemini_payload(self):
+        return json.dumps(
+            {
+                "summary": "A light, airy look is needed.",
+                "suggestions": [
+                    {
+                        "item_description": "tan loafers",
+                        "reason": "They balance the relaxed outfit.",
+                        "priority": "medium",
+                    }
+                ],
+            }
+        )
+
+    def test_primary_path_uses_file_search_tool(self):
+        service = StyleAdvisorService(model_name="gemini-2.5-flash")
         with patch(
-            "apps.styleadvisor.services.retrieve_relevant_chunks",
-            return_value=list(StyleKnowledgeChunk.objects.all()),
+            "apps.styleadvisor.services.get_file_search_store",
+            return_value=type("Store", (), {"name": "fileSearchStores/abc"})(),
+        ), patch(
+            "apps.styleadvisor.services.generate_gemini_text_with_file_search",
+            return_value=(self._gemini_payload(), [{"uri": "fileSearchStores/abc/documents/x", "title": "fabrics.md"}]),
         ), patch(
             "apps.styleadvisor.services.generate_gemini_text",
-            return_value=json.dumps(
-                {
-                    "summary": "A light, airy look is needed.",
-                    "suggestions": [
-                        {
-                            "item_description": "tan loafers",
-                            "reason": "They balance the relaxed outfit.",
-                            "priority": "medium",
-                        }
-                    ],
-                }
-            ),
+            side_effect=AssertionError("fallback should not run on the primary path"),
         ):
-            result = service.generate_shopping_suggestions(self.user, input_data)
+            result = service.generate_shopping_suggestions(self.user, self._input())
 
         self.assertEqual(len(result.suggestions), 1)
         self.assertEqual(result.suggestions[0].item_description, "tan loafers")
         self.assertEqual(result.summary, "A light, airy look is needed.")
+        self.assertEqual(result.retrieval, "file-search")
+        self.assertIn("fabrics.md", result.source_files)
+        self.assertEqual(ShoppingSuggestion.objects.count(), 1)
+
+    def test_fallback_used_when_file_search_unavailable(self):
+        service = StyleAdvisorService(model_name="gemini-2.5-flash")
+        with patch("apps.styleadvisor.services.get_file_search_store", return_value=None), patch(
+            "apps.styleadvisor.services.retrieve_relevant_chunks",
+            return_value=list(StyleKnowledgeChunk.objects.all()),
+        ), patch(
+            "apps.styleadvisor.services.generate_gemini_text",
+            return_value=self._gemini_payload(),
+        ):
+            result = service.generate_shopping_suggestions(self.user, self._input())
+
+        self.assertEqual(len(result.suggestions), 1)
+        self.assertEqual(result.retrieval, "local")
+        self.assertEqual(result.source_files, [])
+        self.assertEqual(ShoppingSuggestion.objects.count(), 1)
+
+    def test_fallback_used_when_file_search_generation_fails(self):
+        service = StyleAdvisorService(model_name="gemini-2.5-flash")
+        with patch(
+            "apps.styleadvisor.services.get_file_search_store",
+            return_value=type("Store", (), {"name": "fileSearchStores/abc"})(),
+        ), patch(
+            "apps.styleadvisor.services.generate_gemini_text_with_file_search",
+            side_effect=RuntimeError("boom"),
+        ), patch(
+            "apps.styleadvisor.services.retrieve_relevant_chunks",
+            return_value=list(StyleKnowledgeChunk.objects.all()),
+        ), patch(
+            "apps.styleadvisor.services.generate_gemini_text",
+            return_value=self._gemini_payload(),
+        ):
+            result = service.generate_shopping_suggestions(self.user, self._input())
+
+        self.assertEqual(result.retrieval, "local")
         self.assertEqual(ShoppingSuggestion.objects.count(), 1)
 
 
@@ -97,9 +142,9 @@ class KnowledgeIngestionTests(TestCase):
             path.unlink(missing_ok=True)
 
     def _run_ingest(self):
-        with patch("apps.styleadvisor.retriever.sync_corpus_document", return_value="corpora/x/documents/y"), patch(
-            "apps.styleadvisor.retriever.generate_embedding",
-            return_value=[0.1, 0.2, 0.3],
+        with patch("apps.styleadvisor.retriever.get_file_search_store", return_value=None), patch(
+            "apps.styleadvisor.retriever.upload_content_to_store",
+            return_value="fileSearchStores/x/documents/y",
         ):
             return ingestion.ingest_knowledge_folder()
 
@@ -135,7 +180,7 @@ class KnowledgeIngestionTests(TestCase):
         self.assertEqual(dress.title, "Dress Codes")
         self.assertIn("formal", dress.tags)
         self.assertTrue(dress.content_hash)
-        self.assertEqual(dress.embedding, [0.1, 0.2, 0.3])
+        self.assertEqual(dress.embedding, [])
 
 
 class KnowledgeRetrievalTests(TestCase):
@@ -157,39 +202,11 @@ class KnowledgeRetrievalTests(TestCase):
             embedding=[],
         )
 
-    def test_retrieval_uses_file_search_results(self):
-        with patch(
-            "apps.styleadvisor.retriever.query_rag_corpus",
-            return_value=[
-                {"text": "Beach weddings call for linen.", "metadata": {"source_file": "dress_codes.md"}},
-                {"text": "Office wear needs tailoring.", "metadata": {"source_file": "occasion_styling.md"}},
-            ],
-        ):
-            result = retrieve_relevant_chunks("beach wedding", top_k=1)
+    def test_local_fallback_ranks_relevant_chunk_first(self):
+        result = retrieve_relevant_chunks("beach wedding", top_k=1)
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].source_file, "dress_codes.md")
 
-    def test_retrieval_falls_back_to_local_when_file_search_empty(self):
-        with patch("apps.styleadvisor.retriever.query_rag_corpus", return_value=[]), patch(
-            "apps.styleadvisor.retriever.generate_embedding",
-            return_value=None,
-        ):
-            result = retrieve_relevant_chunks("beach wedding", top_k=1)
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].source_file, "dress_codes.md")
-
-    def test_retrieval_uses_embeddings_when_available(self):
-        with patch("apps.styleadvisor.retriever.query_rag_corpus", return_value=[]), patch(
-            "apps.styleadvisor.retriever.generate_embedding",
-            return_value=[1.0, 0.0, 0.0],
-        ):
-            result = retrieve_relevant_chunks("beach wedding", top_k=1)
-        self.assertEqual(len(result), 1)
-
-    def test_retrieval_returns_empty_with_no_chunks(self):
+    def test_local_fallback_returns_empty_with_no_chunks(self):
         StyleKnowledgeChunk.objects.all().delete()
-        with patch("apps.styleadvisor.retriever.query_rag_corpus", return_value=[]), patch(
-            "apps.styleadvisor.retriever.generate_embedding",
-            return_value=None,
-        ):
-            self.assertEqual(retrieve_relevant_chunks("beach wedding"), [])
+        self.assertEqual(retrieve_relevant_chunks("beach wedding"), [])

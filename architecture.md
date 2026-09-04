@@ -69,13 +69,13 @@ backend/
     ├── analytics/       # no new models (reads WearLog + WardrobeItem)
     │   └── aggregations.py  # sliding window, frequency, cost-per-wear
     ├── styleadvisor/    # StyleKnowledgeChunk, ShoppingSuggestion
-    │   ├── retriever.py # Gemini File Search retrieval (corpus) + local embedding fallback
+    │   ├── retriever.py # local fallback retrieval (File Search is the primary path in services)
     │   └── ingestion.py # idempotent ingest of backend/knowledge/*.md
     └── outfits/         # Outfit (saved outfit snapshots) — CRUD via /api/outfits/
         └── models.py    # JSON-snapshot items so social cards render for any viewer
 ```
 
-`backend/knowledge/*.md` holds the curated fashion knowledge (dress codes, fabrics, color theory, seasonal dressing, occasions, coordination, footwear, accessories, fit). Ingest it with `python manage.py ingest_style_knowledge` (idempotent by `source_file` + content hash; `--force` re-uploads). Ingestion indexes each file into the persistent Gemini File Search corpus (`GEMINI_RAG_CORPUS`); retrieval queries that corpus and falls back to local embedding/keyword scoring when File Search is unavailable.
+`backend/knowledge/*.md` holds the curated fashion knowledge (dress codes, fabrics, color theory, seasonal dressing, occasions, coordination, footwear, accessories, fit). Ingest it with `python manage.py ingest_style_knowledge` (idempotent by `source_file` + content hash; `--force` re-uploads). Ingestion uploads each file into the persistent Gemini File Search Store (`GEMINI_RAG_STORE`); the Style Advisor supplies that store to Gemini as a `file_search` tool. If File Search is unavailable it falls back to local keyword/tag scoring — clearly logged.
 
 ### `styling-service/` — Clean Architecture (DolphJS Spring OOP)
 DolphJS Spring mode = OOP controllers + TypeScript decorators. The codebase is layered into application (use-cases), domain (entities + domain services), infrastructure (database + queue), and presentation (HTTP controllers/components).

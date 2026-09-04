@@ -56,6 +56,8 @@ class StyleCompleteView(APIView):
                 {
                     "suggestions": ShoppingSuggestionSerializer(result.suggestions, many=True).data,
                     "summary": result.summary,
+                    "source_files": result.source_files,
+                    "retrieval": result.retrieval,
                 },
                 status=status.HTTP_201_CREATED,
             )

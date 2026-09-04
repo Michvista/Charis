@@ -2,57 +2,32 @@ from __future__ import annotations
 
 import logging
 import re
-import tempfile
-import uuid
-from pathlib import Path
 
-from .embeddings import cosine_similarity, generate_embedding
-from .gemini_client import query_rag_corpus, sync_corpus_document
+from .gemini_client import get_file_search_store, get_genai_client, upload_content_to_store
 from .models import StyleKnowledgeChunk
 
 logger = logging.getLogger("styleadvisor")
 
 
-def _document_metadata(source_file: str, title: str, content_hash: str, tags: list) -> dict:
-    return {
-        "source_file": source_file,
-        "title": title,
-        "content_hash": content_hash,
-        "tags": ",".join(tags or []),
-    }
+def _sync_to_store(content: str, source_file: str, title: str) -> str:
+    """Upload knowledge content into the persistent File Search Store.
 
-
-def _upload_content_to_gemini(content: str, previous_ref: str = "") -> str:
-    """Upload ``content`` to Gemini file storage and return the reference.
-
-    Retained for backward compatibility; new code uses ``sync_corpus_document``.
+    Gemini File Search handles chunking, embedding and indexing internally, so
+    we only sync the raw file. Returns a store reference for audit/metadata or
+    "" when File Search is unavailable (local fallback handles retrieval).
     """
-    from .gemini_client import upload_gemini_file
+    client = get_genai_client()
+    store = get_file_search_store(client)
+    if client is None or store is None:
+        logger.warning(
+            "[styleadvisor] File Search Store unavailable — knowledge saved to DB only "
+            "(retrieval will fall back to local scoring)"
+        )
+        return ""
 
-    temp_path: str | None = None
-    try:
-        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as handle:
-            handle.write(content)
-            temp_path = handle.name
-        return upload_gemini_file(temp_path) or previous_ref
-    except Exception:
-        return previous_ref
-    finally:
-        if temp_path:
-            try:
-                Path(temp_path).unlink(missing_ok=True)
-            except OSError:
-                pass
-
-
-def _sync_corpus(content: str, source_file: str, title: str, content_hash: str, tags: list) -> str:
-    """Ensure the knowledge is indexed in the persistent File Search corpus."""
-    document_id = source_file or title or f"chunk-{uuid.uuid4()}"
-    return sync_corpus_document(
-        content=content,
-        document_id=document_id,
-        metadata=_document_metadata(source_file, title, content_hash, tags),
-    )
+    store_name = getattr(store, "name", None) or store
+    document_id = source_file or title or "knowledge"
+    return upload_content_to_store(client, store_name, content, document_id)
 
 
 def upload_knowledge_chunk(
@@ -62,22 +37,20 @@ def upload_knowledge_chunk(
     source_file: str = "",
     content_hash: str = "",
 ):
-    """Persist a knowledge chunk: File Search corpus + local DB record + embedding.
+    """Persist a knowledge chunk: File Search Store + local DB record.
 
     ``content_hash`` enables idempotent ingestion: callers compare hashes to
     skip or update existing records instead of creating duplicates.
     """
-    corpus_ref = _sync_corpus(content, source_file, title, content_hash, tags)
-    embedding = generate_embedding(content) or []
-
+    store_ref = _sync_to_store(content, source_file, title)
     return StyleKnowledgeChunk.objects.create(
         title=title,
         content=content,
         tags=tags,
-        embedding_ref=corpus_ref,
+        embedding_ref=store_ref,
         source_file=source_file,
         content_hash=content_hash,
-        embedding=embedding,
+        embedding=[],
     )
 
 
@@ -89,17 +62,16 @@ def update_knowledge_chunk(
     source_file: str = "",
     content_hash: str = "",
 ):
-    """Refresh an existing knowledge chunk (corpus doc, content, tags, hash, embedding)."""
-    corpus_ref = _sync_corpus(content, source_file, title, content_hash, tags) or chunk.embedding_ref
-    embedding = generate_embedding(content) or []
+    """Refresh an existing knowledge chunk (store sync + DB record)."""
+    store_ref = _sync_to_store(content, source_file, title) or chunk.embedding_ref
 
     chunk.title = title
     chunk.content = content
     chunk.tags = tags
-    chunk.embedding_ref = corpus_ref
+    chunk.embedding_ref = store_ref
     chunk.source_file = source_file
     chunk.content_hash = content_hash
-    chunk.embedding = embedding
+    chunk.embedding = []
     chunk.save()
     return chunk
 
@@ -115,77 +87,34 @@ def _keyword_score(query: str, chunk: StyleKnowledgeChunk) -> float:
         return 0.0
 
     tag_text = " ".join(chunk.tags or []).lower()
-    content_text = (chunk.title or "") + " " + chunk.content
-    content_text = content_text.lower()
+    content_text = ((chunk.title or "") + " " + chunk.content).lower()
 
     hits = sum(1 for token in tokens if token in tag_text)
     hits += sum(1 for token in tokens if token in content_text)
     return float(hits)
 
 
-def _map_file_search_results(results: list[dict], top_k: int) -> list[StyleKnowledgeChunk]:
-    """Map File Search results back to local knowledge records by source_file."""
-    by_source: dict[str, StyleKnowledgeChunk] = {}
-    for chunk in StyleKnowledgeChunk.objects.all():
-        by_source[chunk.source_file] = chunk
+def retrieve_relevant_chunks(query: str, top_k: int = 5, model_name: str | None = None):
+    """LOCAL FALLBACK retrieval (keyword/tag scoring).
 
-    selected: list[StyleKnowledgeChunk] = []
-    seen: set = set()
-    for result in results:
-        source = (result.get("metadata") or {}).get("source_file") or ""
-        chunk = by_source.get(source)
-        if chunk is None or chunk.id in seen:
-            continue
-        seen.add(chunk.id)
-        selected.append(chunk)
-        if len(selected) >= top_k:
-            break
-    return selected
-
-
-def _local_retrieval(query: str, top_k: int) -> list[StyleKnowledgeChunk]:
-    """Fallback retrieval using local embeddings + lexical scoring."""
+    This is NOT the primary path — the Style Advisor uses Gemini File Search as
+    its primary knowledge source and only calls this when File Search is
+    unavailable or fails. The log line below makes the fallback explicit.
+    """
     chunks = list(StyleKnowledgeChunk.objects.order_by("created_at"))
     if not chunks:
         return []
 
-    query_embedding = generate_embedding(query)
-
-    scored: list[tuple[float, StyleKnowledgeChunk]] = []
-    for chunk in chunks:
-        semantic = (
-            cosine_similarity(query_embedding, chunk.embedding)
-            if query_embedding and chunk.embedding
-            else 0.0
-        )
-        lexical = _keyword_score(query, chunk)
-        scored.append((semantic + (lexical * 0.2), chunk))
-
+    scored = [(_keyword_score(query, chunk), chunk) for chunk in chunks]
     scored.sort(key=lambda item: item[0], reverse=True)
 
     selected = [chunk for score, chunk in scored[:top_k] if score > 0]
-    return selected or chunks[:top_k]
-
-
-def retrieve_relevant_chunks(query: str, top_k: int = 5, model_name: str | None = None):
-    """Retrieve the most relevant knowledge chunks for ``query``.
-
-    Primary mechanism is Gemini File Search (semantic retrieval against the
-    persistent corpus). If File Search is unavailable or returns nothing, we fall
-    back to local embedding cosine similarity + lexical scoring so retrieval
-    always works (and stays unit-testable offline).
-    """
-    file_search_results = query_rag_corpus(query, top_k=top_k)
-    selected = _map_file_search_results(file_search_results, top_k)
-    source = "file-search"
-
     if not selected:
-        selected = _local_retrieval(query, top_k)
-        source = "local"
+        selected = chunks[:top_k]
 
-    logger.info("Query: %s (retrieval: %s)", query, source)
     logger.info(
-        "Retrieved: %s",
+        "[styleadvisor] FALLBACK local retrieval for '%s' -> %s",
+        query,
         ", ".join(chunk.source_file or chunk.title or chunk.content[:40] for chunk in selected),
     )
     return selected

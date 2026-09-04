@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass
@@ -93,124 +95,162 @@ def generate_gemini_text(model_name: str, prompt: str) -> str:
     return text
 
 
-def upload_gemini_file(file_path: str) -> str:
-    """Upload a file to Gemini file storage. Retained for backward compatibility."""
-    client = get_genai_client()
-    if client is None:
-        return ""
-
-    try:
-        uploaded = client.files.upload(file=file_path)
-        return getattr(uploaded, "uri", "") or getattr(uploaded, "name", "") or ""
-    except Exception:
-        return ""
-
-
 # ---------------------------------------------------------------------------
-# Gemini File Search (Retriever) — the actual RAG store + retrieval mechanism.
+# Gemini File Search Store — the current, documented File Search API.
+#   - persistent store: get/create once, reused (never per-request create)
+#   - ingestion uploads files into the store (auto chunked/embedded/indexed)
+#   - Style Advisor supplies the store as a `file_search` tool to Gemini
 # ---------------------------------------------------------------------------
 
-_RAG_CORPUS_CACHE: dict[str, object] = {}
+_FILE_SEARCH_CACHE: dict[str, object] = {}
 
 
-def get_rag_corpus(client=None):
-    """Return the persistent File Search corpus (get or create, never per-request create).
+def get_file_search_store(client=None):
+    """Return the persistent File Search Store (get or create, cached).
 
-    Configure the server-side corpus resource name with the ``GEMINI_RAG_CORPUS``
-    environment variable (e.g. ``corpora/charis-style-knowledge``). When unset,
-    the corpus is created once with a stable display name and then re-found by
-    name on subsequent calls (cached in-process).
+    Configure the resource name with the ``GEMINI_RAG_STORE`` env var (e.g.
+    ``fileSearchStores/xxx``). When unset, a store with the stable display name
+    ``charis-style-knowledge`` is created once and then found by name.
     """
     if client is None:
         client = get_genai_client()
     if client is None:
         return None
 
-    display_name = os.getenv("GEMINI_RAG_CORPUS", "charis-style-knowledge")
+    display_name = os.getenv("GEMINI_RAG_STORE", "charis-style-knowledge")
 
-    if display_name in _RAG_CORPUS_CACHE:
-        return _RAG_CORPUS_CACHE[display_name]
+    if display_name in _FILE_SEARCH_CACHE:
+        return _FILE_SEARCH_CACHE[display_name]
 
     # Fast path: env holds a server-side resource name.
     if "/" in display_name:
         try:
-            corpus = client.retrievers.get_corpus(name=display_name)
-            _RAG_CORPUS_CACHE[display_name] = corpus
-            return corpus
+            store = client.file_search_stores.get(name=display_name)
+            _FILE_SEARCH_CACHE[display_name] = store
+            return store
         except Exception:
             pass
 
-    # Find an existing corpus by display name before creating a new one.
+    # Find an existing store by display name before creating a new one.
     try:
-        page = client.retrievers.list_corpora()
-        for corpus in getattr(page, "corpora", None) or []:
-            if getattr(corpus, "display_name", "") == display_name:
-                _RAG_CORPUS_CACHE[display_name] = corpus
-                return corpus
+        page = client.file_search_stores.list()
+        for store in getattr(page, "file_search_stores", None) or []:
+            if getattr(store, "display_name", "") == display_name:
+                _FILE_SEARCH_CACHE[display_name] = store
+                return store
     except Exception:
         pass
 
     try:
-        corpus = client.retrievers.create_corpus(display_name=display_name)
-        _RAG_CORPUS_CACHE[display_name] = corpus
-        return corpus
+        store = client.file_search_stores.create(display_name=display_name)
+        _FILE_SEARCH_CACHE[display_name] = store
+        return store
     except Exception:
         return None
 
 
-def sync_corpus_document(content: str, document_id: str, metadata: dict | None = None, client=None) -> str:
-    """Create (or recreate) a document in the File Search corpus. Returns its name."""
-    if client is None:
-        client = get_genai_client()
-    corpus = get_rag_corpus(client)
-    if client is None or corpus is None:
-        return ""
-
-    corpus_name = getattr(corpus, "name", None) or corpus
-    document_name = f"{corpus_name}/documents/{document_id}"
-
+def wait_for_operation(client, operation, timeout_seconds: int = 180):
+    """Poll a File Search upload/import operation until done (best effort)."""
     try:
-        from google.genai import types  # type: ignore
+        op = operation
+        name = getattr(op, "name", None) or getattr(getattr(op, "operation", None), "name", None)
+        deadline = time.time() + timeout_seconds
+        while time.time() < deadline:
+            if getattr(op, "done", False):
+                return op
+            if name:
+                op = client.operations.get(name=name)
+            if getattr(op, "done", False):
+                return op
+            time.sleep(3)
+    except Exception:
+        pass
+    return operation
 
-        # Remove any existing document so re-ingesting a changed file is idempotent.
+
+def upload_content_to_store(client, store_name: str, content: str, filename: str) -> str:
+    """Upload ``content`` into the File Search Store and wait for completion.
+
+    Returns a reference (operation/document name) on success, or "" on failure.
+    """
+    temp_path: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as handle:
+            handle.write(content)
+            temp_path = handle.name
+
         try:
-            client.retrievers.delete_document(name=document_name)
+            operation = client.file_search_stores.upload_to_file_search_store(
+                store_name=store_name,
+                files=[temp_path],
+            )
         except Exception:
-            pass
+            # Defensive: some SDK versions expect a typed inline file object.
+            from google.genai import types  # type: ignore
 
-        contents = [types.Content(role="user", parts=[types.Part(text=content)])]
-        document = client.retrievers.create_document(
-            corpus=corpus_name,
-            document_id=document_id,
-            metadata=metadata or {},
-            contents=contents,
+            operation = client.file_search_stores.upload_to_file_search_store(
+                store_name=store_name,
+                files=[
+                    types.FileSearchStoreUploadFileData(
+                        filename=filename,
+                        inline_data=types.Part(text=content),
+                    )
+                ],
+            )
+
+        wait_for_operation(client, operation)
+        return (
+            getattr(operation, "name", "")
+            or getattr(getattr(operation, "operation", None), "name", "")
+            or store_name
         )
-        return getattr(document, "name", "") or document_name
     except Exception:
         return ""
+    finally:
+        if temp_path:
+            try:
+                Path(temp_path).unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
-def query_rag_corpus(query: str, top_k: int = 5, client=None) -> list[dict]:
-    """Run semantic File Search retrieval against the corpus. Returns chunk dicts."""
+def generate_gemini_text_with_file_search(
+    model_name: str,
+    prompt: str,
+    store_name: str,
+) -> tuple[str, list[dict]]:
+    """Call Gemini with the File Search Store attached as a ``file_search`` tool.
+
+    Returns ``(text, citations)`` where citations is a list of
+    ``{"uri": ..., "title": ...}`` entries for the knowledge files used.
+    """
+    client = get_genai_client()
     if client is None:
-        client = get_genai_client()
-    corpus = get_rag_corpus(client)
-    if client is None or corpus is None:
-        return []
+        return ("", [])
 
-    corpus_name = getattr(corpus, "name", None) or corpus
-    try:
-        response = client.retrievers.query(corpus=corpus_name, query=query, top_k=top_k)
-    except Exception:
-        return []
+    from google.genai import types  # type: ignore
 
-    results: list[dict] = []
-    for chunk in getattr(response, "relevant_chunks", None) or []:
-        results.append(
-            {
-                "text": getattr(chunk, "text", "") or "",
-                "metadata": getattr(chunk, "metadata", None) or {},
-                "score": getattr(chunk, "relevance_score", None),
-            }
-        )
-    return results
+    response = client.models.generate_content(
+        model=model_name,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            tools=[types.Tool(file_search=types.FileSearch(store_name=[store_name]))],
+        ),
+    )
+    text = _extract_candidate_text(response)
+    return (text, _extract_citations(response))
+
+
+def _extract_citations(response) -> list[dict]:
+    """Pull source info from Gemini's citation annotations, if present."""
+    citations: list[dict] = []
+    for citation in getattr(response, "citations", None) or []:
+        source = getattr(citation, "source", None)
+        uri = getattr(source, "uri", "") or ""
+        title = getattr(source, "title", "") or uri
+        file_search = getattr(source, "file_search_source", None)
+        if file_search and not title:
+            title = getattr(file_search, "display_name", "") or getattr(file_search, "document", "") or ""
+        if uri or title:
+            citations.append({"uri": uri, "title": title})
+    return citations

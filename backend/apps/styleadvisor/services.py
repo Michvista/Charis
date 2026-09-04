@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import logging
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from django.db import transaction
 
-from .gemini_client import generate_gemini_text
+from .gemini_client import generate_gemini_text, generate_gemini_text_with_file_search, get_file_search_store
 from .json_utils import extract_json_object
 from .models import ShoppingSuggestion
 from .retriever import retrieve_relevant_chunks
+
+logger = logging.getLogger("styleadvisor")
 
 
 @dataclass(frozen=True)
@@ -23,6 +26,8 @@ class StyleAdvisorInput:
 class StyleAdvisorResult:
     suggestions: list[ShoppingSuggestion]
     summary: str
+    source_files: list[str] = field(default_factory=list)
+    retrieval: str = "file-search"  # "file-search" | "local"
 
 
 class StyleAdvisorService:
@@ -37,20 +42,16 @@ class StyleAdvisorService:
             self.model_name,
         )
 
-    def _build_prompt(self, occasion_description: str, occasion_formality: int, current_item_descriptions: list[str]) -> str:
-        chunks = retrieve_relevant_chunks(
-            occasion_description,
-            top_k=5,
-            model_name=self.retriever_model_name,
-        )
-        knowledge_blocks = []
-        for chunk in chunks:
-            title = chunk.title or chunk.source_file or "Style knowledge"
-            tags = ", ".join(chunk.tags or [])
-            header = f"### {title}" + (f" [tags: {tags}]" if tags else "")
-            knowledge_blocks.append(f"{header}\n{chunk.content}")
-        knowledge_text = "\n\n".join(knowledge_blocks) if knowledge_blocks else "(no knowledge retrieved)"
-
+    # ------------------------------------------------------------------
+    # Primary prompt (Gemini + File Search tool). No manual knowledge
+    # injection — the File Search tool supplies the retrieved knowledge.
+    # ------------------------------------------------------------------
+    def _build_prompt_without_knowledge(
+        self,
+        occasion_description: str,
+        occasion_formality: int,
+        current_item_descriptions: list[str],
+    ) -> str:
         owned = ", ".join(current_item_descriptions) if current_item_descriptions else "(none provided)"
 
         return (
@@ -59,11 +60,11 @@ class StyleAdvisorService:
             f"{occasion_description} (formality {occasion_formality}/5)\n\n"
             "## User's current wardrobe items\n"
             f"{owned}\n\n"
-            "## Relevant fashion knowledge (use this as grounding)\n"
-            f"{knowledge_text}\n\n"
             "## Instructions\n"
-            "- Base your advice on the retrieved knowledge; do not blindly repeat it and do not dump it verbatim.\n"
-            "- Do not invent facts when the knowledge base already provides the answer.\n"
+            "- Use the File Search tool to retrieve the relevant fashion knowledge "
+            "(dress codes, fabrics, color, seasons, footwear, accessories, fit) and ground your "
+            "answer in it. Do not dump the retrieved material verbatim.\n"
+            "- Do not invent facts when the retrieved knowledge provides the answer.\n"
             "- Consider the user's actual wardrobe items and the occasion's formality.\n"
             "- Clearly distinguish what the user already owns, what is missing, and what you recommend.\n"
             "- Do not recommend an item the user already owns unless there is a specific reason to.\n"
@@ -89,19 +90,107 @@ class StyleAdvisorService:
             "}"
         )
 
+    # ------------------------------------------------------------------
+    # Fallback prompt (local retrieval): knowledge is injected manually
+    # because the File Search tool is unavailable.
+    # ------------------------------------------------------------------
+    def _build_prompt_with_knowledge(
+        self,
+        occasion_description: str,
+        occasion_formality: int,
+        current_item_descriptions: list[str],
+        chunks,
+    ) -> str:
+        knowledge_blocks = []
+        for chunk in chunks:
+            title = chunk.title or chunk.source_file or "Style knowledge"
+            tags = ", ".join(chunk.tags or [])
+            header = f"### {title}" + (f" [tags: {tags}]" if tags else "")
+            knowledge_blocks.append(f"{header}\n{chunk.content}")
+        knowledge_text = "\n\n".join(knowledge_blocks) if knowledge_blocks else "(no knowledge retrieved)"
+
+        base = self._build_prompt_without_knowledge(occasion_description, occasion_formality, current_item_descriptions)
+        # Replace the tool instruction with explicitly provided knowledge.
+        base = base.replace(
+            "- Use the File Search tool to retrieve the relevant fashion knowledge "
+            "(dress codes, fabrics, color, seasons, footwear, accessories, fit) and ground your "
+            "answer in it. Do not dump the retrieved material verbatim.\n",
+            "",
+        )
+        return base.replace(
+            "## User's current wardrobe items\n",
+            "## Relevant fashion knowledge (use this as grounding)\n"
+            f"{knowledge_text}\n\n"
+            "## User's current wardrobe items\n",
+        )
+
+    def _try_file_search(self, input_data: StyleAdvisorInput):
+        """Primary path: Gemini + File Search tool. Returns (payload, source_files) or None."""
+        store = get_file_search_store()
+        if store is None:
+            logger.warning("[styleadvisor] File Search Store unavailable — falling back to local retrieval")
+            return None
+
+        store_name = getattr(store, "name", None) or store
+        prompt = self._build_prompt_without_knowledge(
+            input_data.occasion_description,
+            input_data.occasion_formality,
+            input_data.current_item_descriptions,
+        )
+
+        try:
+            raw_text, citations = generate_gemini_text_with_file_search(self.model_name, prompt, store_name)
+        except Exception as exc:
+            logger.warning("[styleadvisor] File Search generation failed (%s) — falling back to local retrieval", exc)
+            return None
+
+        if not raw_text:
+            logger.warning("[styleadvisor] File Search returned an empty response — falling back to local retrieval")
+            return None
+
+        payload = extract_json_object(raw_text)
+        source_files = list(
+            dict.fromkeys((c.get("title") or c.get("uri") or "").strip() for c in citations if c.get("title") or c.get("uri"))
+        )
+        return (payload, source_files)
+
     def generate_shopping_suggestions(
         self,
         user,
         input_data: StyleAdvisorInput,
     ) -> StyleAdvisorResult:
-        prompt = self._build_prompt(
+        primary = self._try_file_search(input_data)
+        if primary is not None:
+            payload, source_files = primary
+            result = self._save_result(user, input_data, payload, source_files=source_files, retrieval="file-search")
+            logger.info("[styleadvisor] retrieval: file-search (sources: %s)", ", ".join(source_files) or "n/a")
+            return result
+
+        # Explicit fallback: local retrieval, clearly logged.
+        chunks = retrieve_relevant_chunks(
+            input_data.occasion_description,
+            top_k=5,
+            model_name=self.retriever_model_name,
+        )
+        prompt = self._build_prompt_with_knowledge(
             input_data.occasion_description,
             input_data.occasion_formality,
             input_data.current_item_descriptions,
+            chunks,
         )
         raw_text = generate_gemini_text(self.model_name, prompt)
         payload = extract_json_object(raw_text)
+        logger.info("[styleadvisor] retrieval: local (fallback)")
+        return self._save_result(user, input_data, payload, source_files=[], retrieval="local")
 
+    def _save_result(
+        self,
+        user,
+        input_data: StyleAdvisorInput,
+        payload: dict,
+        source_files: list[str],
+        retrieval: str,
+    ) -> StyleAdvisorResult:
         suggestions = payload.get("suggestions", [])
         if not isinstance(suggestions, list):
             raise ValueError("Gemini response missing suggestions list.")
@@ -127,4 +216,9 @@ class StyleAdvisorService:
                 saved_suggestions.append(saved)
 
         summary = str(payload.get("summary", "")).strip()
-        return StyleAdvisorResult(suggestions=saved_suggestions, summary=summary)
+        return StyleAdvisorResult(
+            suggestions=saved_suggestions,
+            summary=summary,
+            source_files=source_files,
+            retrieval=retrieval,
+        )

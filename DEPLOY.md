@@ -67,7 +67,7 @@ Browser ──► Vercel (Next.js)  ──rewrites──►  Render: charis-back
    CLOUDINARY_API_SECRET=...
    STYLING_SERVICE_URL=https://charis-styling.onrender.com
    STYLING_SERVICE_INTERNAL_TOKEN=<INTERNAL_API_KEY value>
-   GEMINI_RAG_CORPUS=            # optional — leave blank
+   GEMINI_RAG_STORE=            # optional — leave blank (auto-creates "charis-style-knowledge")
    ```
 
 > Render free services sleep after ~15 min idle. First visit after sleep = cold start.
@@ -144,9 +144,9 @@ python manage.py ingest_style_knowledge
 ```
 
 - `migrate` creates all tables (including `outfits_outfit`, `social_vote`, etc.).
-- `ingest_style_knowledge` indexes the 9 files in `backend/knowledge/` into the
-  Gemini File Search corpus and Postgres. Run `--force` once if you want to
-  (re)build the corpus.
+- `ingest_style_knowledge` uploads the files in `backend/knowledge/` into the
+  persistent Gemini File Search Store (`GEMINI_RAG_STORE`) and records them in
+  Postgres. Run `--force` once if you want to (re)build the store.
 
 Then confirm:
 - `https://charis-backend.onrender.com/api/auth/login/` responds.

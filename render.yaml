@@ -7,6 +7,7 @@
 # Postgres and Redis stay EXTERNAL (e.g. Neon + Upstash). Fill in the `sync: false`
 # env vars in the Render dashboard after the services are created.
 #
+# Render's docker runtime uses each Dockerfile's CMD — no startCommand allowed.
 # Replace `repo` with your actual GitHub repository URL if it differs.
 
 services:
@@ -17,7 +18,6 @@ services:
     plan: free
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    startCommand: gunicorn config.wsgi:application -c gunicorn.conf.py
     envVars:
       - key: SECRET_KEY
         sync: false
@@ -55,7 +55,6 @@ services:
     plan: free
     dockerfilePath: ./styling-service/Dockerfile
     dockerContext: ./styling-service
-    startCommand: node app/server.js
     envVars:
       - key: DATABASE_URL
         sync: false # same Postgres, styling_service schema
@@ -73,7 +72,6 @@ services:
     plan: free
     dockerfilePath: ./job-worker/Dockerfile
     dockerContext: ./job-worker
-    startCommand: node dist/index.js
     envVars:
       - key: REDIS_URL
         sync: false # same external Redis as the backend

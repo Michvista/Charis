@@ -11,4 +11,6 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# Production start command (used by Render's docker runtime). Local dev via
+# docker compose overrides this with runserver.
+CMD ["gunicorn", "config.wsgi:application", "-c", "gunicorn.conf.py"]

@@ -73,25 +73,35 @@ export function startComboWorker(): Worker<ComboJobData> {
         const topCombos = (response.combinations || []).slice(0, 10);
         const reranked: Array<GeneratedCombo & { finalScore: number }> = [];
 
-        for (const combo of topCombos) {
-          const imageUrls = combo.items
-            .map((item) => item.imageUrl || wardrobeItems.find((wardrobeItem) => wardrobeItem.id === item.id)?.imageUrl)
-            .filter((url): url is string => Boolean(url));
-          const visualAnalysis = await callGeminiVision(
-            `${COMBO_PROMPT(occasion)}${targetSeason ? ` Season context: ${targetSeason}.` : ""}`,
-            imageUrls,
-          );
-          const parsed = validateComboVisualResult(parseGeminiJson(visualAnalysis));
-          const finalScore = Number(combo.score) * 0.5 + Number(parsed.visualScore) * 0.5;
+        // Rerank the candidate combos with Gemini Vision in PARALLEL with a small
+        // concurrency cap — sequential calls (10 × ~40s) made real combos so slow
+        // the frontend timed out and fell back to mock outfits.
+        const concurrency = 3;
+        const queue = [...topCombos];
+        async function workerLoop(): Promise<void> {
+          while (queue.length > 0) {
+            const combo = queue.shift();
+            if (!combo) return;
+            const imageUrls = combo.items
+              .map((item) => item.imageUrl || wardrobeItems.find((wardrobeItem) => wardrobeItem.id === item.id)?.imageUrl)
+              .filter((url): url is string => Boolean(url));
+            const visualAnalysis = await callGeminiVision(
+              `${COMBO_PROMPT(occasion)}${targetSeason ? ` Season context: ${targetSeason}.` : ""}`,
+              imageUrls,
+            );
+            const parsed = validateComboVisualResult(parseGeminiJson(visualAnalysis));
+            const finalScore = Number(combo.score) * 0.5 + Number(parsed.visualScore) * 0.5;
 
-          reranked.push({
-            ...combo,
-            confirmed: parsed.confirmed,
-            visualScore: parsed.visualScore,
-            visualNotes: parsed.visualNotes,
-            finalScore,
-          });
+            reranked.push({
+              ...combo,
+              confirmed: parsed.confirmed,
+              visualScore: parsed.visualScore,
+              visualNotes: parsed.visualNotes,
+              finalScore,
+            });
+          }
         }
+        await Promise.all(Array.from({ length: Math.min(concurrency, topCombos.length) }, workerLoop));
 
         reranked.sort((left, right) => right.finalScore - left.finalScore);
 

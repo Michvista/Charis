@@ -225,14 +225,18 @@ export default function StylingPage() {
                   toastSuccess('AI Verdict Complete', 'Outfit harmony score calculated.');
                   break;
                 } else if (normalizedVerdict.status === 'failed') {
+                  const workerError =
+                    normalizedVerdict.verdictText ||
+                    normalizedVerdict.errorMessage ||
+                    'AI Verdict processing encountered a worker error.';
                   setVerdict({
                     outfitId,
                     status: 'failed',
                     score: 0,
-                    verdictText: 'AI Verdict processing encountered a worker error.',
+                    verdictText: workerError,
                   });
                   completed = true;
-                  toastError('Verdict Worker Error', 'Styling service failed to process Gemini vision verdict.');
+                  toastError('Verdict Worker Error', workerError);
                   break;
                 }
               }

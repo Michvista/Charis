@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -134,7 +135,11 @@ def get_file_search_store(client=None):
     # Find an existing store by display name before creating a new one.
     try:
         page = client.file_search_stores.list()
-        for store in getattr(page, "file_search_stores", None) or []:
+        try:
+            stores = list(page)
+        except TypeError:
+            stores = getattr(page, "file_search_stores", None) or []
+        for store in stores:
             if getattr(store, "display_name", "") == display_name:
                 _FILE_SEARCH_CACHE[display_name] = store
                 return store
@@ -142,7 +147,11 @@ def get_file_search_store(client=None):
         pass
 
     try:
-        store = client.file_search_stores.create(display_name=display_name)
+        from google.genai import types  # type: ignore
+
+        store = client.file_search_stores.create(
+            config=types.CreateFileSearchStoreConfig(display_name=display_name)
+        )
         _FILE_SEARCH_CACHE[display_name] = store
         return store
     except Exception:
@@ -168,35 +177,33 @@ def wait_for_operation(client, operation, timeout_seconds: int = 180):
     return operation
 
 
-def upload_content_to_store(client, store_name: str, content: str, filename: str) -> str:
+def upload_content_to_store(client, store_name: str, content: str, filename: str, metadata: dict | None = None) -> str:
     """Upload ``content`` into the File Search Store and wait for completion.
 
     Returns a reference (operation/document name) on success, or "" on failure.
     """
     temp_path: str | None = None
     try:
+        from google.genai import types  # type: ignore
+
         with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as handle:
             handle.write(content)
             temp_path = handle.name
 
-        try:
-            operation = client.file_search_stores.upload_to_file_search_store(
-                store_name=store_name,
-                files=[temp_path],
-            )
-        except Exception:
-            # Defensive: some SDK versions expect a typed inline file object.
-            from google.genai import types  # type: ignore
+        custom_metadata = []
+        for key, value in (metadata or {}).items():
+            if isinstance(value, str) and value:
+                custom_metadata.append(types.CustomMetadata(key=key, string_value=value))
 
-            operation = client.file_search_stores.upload_to_file_search_store(
-                store_name=store_name,
-                files=[
-                    types.FileSearchStoreUploadFileData(
-                        filename=filename,
-                        inline_data=types.Part(text=content),
-                    )
-                ],
-            )
+        operation = client.file_search_stores.upload_to_file_search_store(
+            file_search_store_name=store_name,
+            file=temp_path,
+            config=types.UploadToFileSearchStoreConfig(
+                mime_type="text/markdown",
+                display_name=filename,
+                custom_metadata=custom_metadata or None,
+            ),
+        )
 
         wait_for_operation(client, operation)
         return (
@@ -234,7 +241,13 @@ def generate_gemini_text_with_file_search(
         model=model_name,
         contents=prompt,
         config=types.GenerateContentConfig(
-            tools=[types.Tool(file_search=types.FileSearch(store_name=[store_name]))],
+            tools=[
+                types.Tool(
+                    file_search=types.FileSearch(
+                        file_search_store_names=[store_name],
+                    )
+                )
+            ],
         ),
     )
     text = _extract_candidate_text(response)

@@ -9,7 +9,7 @@ from .models import StyleKnowledgeChunk
 logger = logging.getLogger("styleadvisor")
 
 
-def _sync_to_store(content: str, source_file: str, title: str) -> str:
+def _sync_to_store(content: str, source_file: str, title: str, content_hash: str, tags: list) -> str:
     """Upload knowledge content into the persistent File Search Store.
 
     Gemini File Search handles chunking, embedding and indexing internally, so
@@ -27,7 +27,18 @@ def _sync_to_store(content: str, source_file: str, title: str) -> str:
 
     store_name = getattr(store, "name", None) or store
     document_id = source_file or title or "knowledge"
-    return upload_content_to_store(client, store_name, content, document_id)
+    return upload_content_to_store(
+        client,
+        store_name,
+        content,
+        document_id,
+        metadata={
+            "source_file": source_file,
+            "title": title,
+            "content_hash": content_hash,
+            "tags": ",".join(tags or []),
+        },
+    )
 
 
 def upload_knowledge_chunk(
@@ -42,7 +53,7 @@ def upload_knowledge_chunk(
     ``content_hash`` enables idempotent ingestion: callers compare hashes to
     skip or update existing records instead of creating duplicates.
     """
-    store_ref = _sync_to_store(content, source_file, title)
+    store_ref = _sync_to_store(content, source_file, title, content_hash, tags)
     return StyleKnowledgeChunk.objects.create(
         title=title,
         content=content,
@@ -63,7 +74,7 @@ def update_knowledge_chunk(
     content_hash: str = "",
 ):
     """Refresh an existing knowledge chunk (store sync + DB record)."""
-    store_ref = _sync_to_store(content, source_file, title) or chunk.embedding_ref
+    store_ref = _sync_to_store(content, source_file, title, content_hash, tags) or chunk.embedding_ref
 
     chunk.title = title
     chunk.content = content

@@ -64,7 +64,7 @@ class StyleAdvisorServiceTests(TestCase):
         )
 
     def test_primary_path_uses_file_search_tool(self):
-        service = StyleAdvisorService(model_name="gemini-2.5-flash")
+        service = StyleAdvisorService(model_name="gemini-3.6-flash")
         with patch(
             "apps.styleadvisor.services.get_file_search_store",
             return_value=type("Store", (), {"name": "fileSearchStores/abc"})(),
@@ -85,7 +85,7 @@ class StyleAdvisorServiceTests(TestCase):
         self.assertEqual(ShoppingSuggestion.objects.count(), 1)
 
     def test_fallback_used_when_file_search_unavailable(self):
-        service = StyleAdvisorService(model_name="gemini-2.5-flash")
+        service = StyleAdvisorService(model_name="gemini-3.6-flash")
         with patch("apps.styleadvisor.services.get_file_search_store", return_value=None), patch(
             "apps.styleadvisor.services.retrieve_relevant_chunks",
             return_value=list(StyleKnowledgeChunk.objects.all()),
@@ -101,7 +101,7 @@ class StyleAdvisorServiceTests(TestCase):
         self.assertEqual(ShoppingSuggestion.objects.count(), 1)
 
     def test_fallback_used_when_file_search_generation_fails(self):
-        service = StyleAdvisorService(model_name="gemini-2.5-flash")
+        service = StyleAdvisorService(model_name="gemini-3.6-flash")
         with patch(
             "apps.styleadvisor.services.get_file_search_store",
             return_value=type("Store", (), {"name": "fileSearchStores/abc"})(),

@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_MODEL = "gemini-3.6-flash";
 const GEMINI_PROMPT_SUFFIX = " Return ONLY valid JSON with no markdown.";
 
 type GeminiImagePart = {

@@ -399,11 +399,11 @@ export default function StylingPage() {
               </div>
 
               {/* Outfit Canvas Display */}
-              <div className="bg-[#fbf2ed] rounded-2xl p-8 min-h-[340px] flex items-center justify-center relative border border-[#d9c1c0]/40 overflow-hidden shadow-inner">
+              <div className="bg-[#fbf2ed] rounded-2xl p-8 min-h-[340px] flex items-center justify-center relative border border-[#d9c1c0]/40 shadow-inner">
                 {selectedItemsList.length === 0 ? (
                   <p className="text-sm text-[#867272] italic">Select items below to compose your outfit</p>
                 ) : (
-                  <div className="flex gap-4 flex-wrap justify-center items-center">
+                  <div className="flex gap-4 flex-wrap justify-center items-start max-h-[460px] overflow-y-auto pr-1 w-full">
                     {selectedItemsList.map((item, i) => (
                       <motion.div
                         key={item.id || `item-canvas-${i}`}
@@ -495,7 +495,7 @@ export default function StylingPage() {
                 {filteredWardrobeItems.length === 0 ? (
                   <p className="text-xs text-[#867272] italic py-4 text-center">No wardrobe items match your filter.</p>
                 ) : (
-                  <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3 max-h-56 overflow-y-auto pr-1 pt-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 gap-3 max-h-56 overflow-y-auto pr-1 pt-2">
                     {filteredWardrobeItems.map((item, idx) => (
                       <button
                         key={item.id || `wardrobe-pick-${idx}`}

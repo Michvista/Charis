@@ -71,11 +71,28 @@ export async function POST(req: Request) {
       }
     }
 
-    // Fallback: Pick a randomized suggestion
-    const randomItem = FALLBACK_SUGGESTIONS[Math.floor(Math.random() * FALLBACK_SUGGESTIONS.length)];
+    // Temperature-aware fallback so the suggestion always fits the climate,
+    // even when Groq is unavailable (no more random cold-weather picks for hot places).
+    const tempNum = Number(temp);
+    let fallback;
+    if (!Number.isNaN(tempNum)) {
+      const t = Math.round(tempNum);
+      if (t >= 80) {
+        fallback = { title: 'Linen Shirt & Wide Trousers', temp: `${t}°F`, detail: 'Breathable lightweight layers for warm sun' };
+      } else if (t >= 65) {
+        fallback = { title: 'Silk Trench & Tailored Trousers', temp: `${t}°F`, detail: 'Effortless elegance for mild weather' };
+      } else if (t >= 55) {
+        fallback = { title: 'Cashmere Knit & Wool Coat', temp: `${t}°F`, detail: 'Insulating warmth for crisp, chilly air' };
+      } else {
+        fallback = { title: 'Merino Wool & Leather', temp: `${t}°F`, detail: 'Refined insulation against cool breeze' };
+      }
+    } else {
+      fallback = FALLBACK_SUGGESTIONS[Math.floor(Math.random() * FALLBACK_SUGGESTIONS.length)];
+    }
+
     return NextResponse.json({
-      ...randomItem,
-      source: 'curated-randomizer',
+      ...fallback,
+      source: 'curated-temperature',
     });
   } catch (err) {
     const randomItem = FALLBACK_SUGGESTIONS[Math.floor(Math.random() * FALLBACK_SUGGESTIONS.length)];

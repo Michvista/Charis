@@ -53,28 +53,37 @@ export default function HomePage() {
     detail: 'Effortless elegance matched for your local climate',
   });
   const [loadingSuggestion, setLoadingSuggestion] = useState(false);
+  const [locationLabel, setLocationLabel] = useState('your location');
 
-  // Get coordinates: browser geolocation first, IP geolocation as a fallback
-  // (covers users who deny the browser prompt — the suggestion must still work).
-  const getCoordinates = async (): Promise<{ latitude: number; longitude: number } | null> => {
+  // Get coordinates + a human-readable location label (city, region, country).
+  // Browser geolocation first for coords; ipwho.is provides the label and a fallback.
+  const getCoordinates = async (): Promise<{ latitude: number; longitude: number; locationLabel: string } | null> => {
+    let coords: { latitude: number; longitude: number } | null = null;
+
     if (typeof window !== 'undefined' && 'geolocation' in navigator) {
       try {
         const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 4000, maximumAge: 600000 });
         });
-        return { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+        coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
       } catch {}
     }
+
+    let locationLabel = 'your location';
     try {
       const res = await fetch('https://ipwho.is/');
       if (res.ok) {
         const data = await res.json();
-        if (typeof data?.latitude === 'number' && typeof data?.longitude === 'number') {
-          return { latitude: data.latitude, longitude: data.longitude };
+        const parts = [data?.city, data?.region, data?.country].filter((v) => typeof v === 'string' && v);
+        if (parts.length) locationLabel = parts.join(', ');
+        if (!coords && typeof data?.latitude === 'number' && typeof data?.longitude === 'number') {
+          coords = { latitude: data.latitude, longitude: data.longitude };
         }
       }
     } catch {}
-    return null;
+
+    if (!coords) return null;
+    return { ...coords, locationLabel };
   };
 
   // Fetch real temperature via Geolocation / Open-Meteo API
@@ -83,7 +92,8 @@ export default function HomePage() {
     try {
       const coords = await getCoordinates();
       if (coords) {
-        const { latitude, longitude } = coords;
+        const { latitude, longitude, locationLabel: label } = coords;
+        setLocationLabel(label);
         try {
           const res = await fetch(
             `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&temperature_unit=fahrenheit`
@@ -99,14 +109,14 @@ export default function HomePage() {
               const aiRes = await fetch('/api/today-suggestion', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  timezone,
-                  currentTime: new Date().toISOString(),
-                  temp: tempF,
-                  condition,
-                  season,
-                  location: 'your current location',
-                }),
+body: JSON.stringify({
+                      timezone,
+                      currentTime: new Date().toISOString(),
+                      temp: tempF,
+                      condition,
+                      season,
+                      location: label,
+                    }),
               });
               const aiData = await aiRes.json();
               if (aiData?.title && aiData?.temp) {
@@ -290,7 +300,7 @@ export default function HomePage() {
               {suggestion.detail && <p className="text-xs text-[#544342] leading-normal">{suggestion.detail}</p>}
               <div className="flex items-center gap-2 text-xs font-medium text-[#380208] bg-[#fbf2ed] px-2.5 py-1.5 rounded-md w-fit mt-1">
                 <HugeiconsIcon icon={ThermometerIcon} size={14} />
-                <span>{suggestion.temp} · Local Climate</span>
+                <span>{suggestion.temp} · {locationLabel}</span>
               </div>
             </motion.div>
           </div>

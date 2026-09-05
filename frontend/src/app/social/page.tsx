@@ -75,6 +75,12 @@ export default function SocialPage() {
       setShares(feedData);
       if (userProf) setProfile(userProf as UserProfile);
       setFriendships(friendData);
+      // Seed the "already followed" set from existing friendships so the UI
+      // never shows "Follow" for someone we've already connected with.
+      const friendIds = (friendData || [])
+        .flatMap((f: any) => [f?.requester, f?.addressee])
+        .filter((id: any) => id && id !== session?.user?.id);
+      setRequestedFriends((prev) => new Set([...prev, ...friendIds]));
     } catch {
       // silently fail
     } finally {
@@ -245,11 +251,19 @@ export default function SocialPage() {
       return;
     }
     try {
-      await createFriendship(session.accessToken, userId);
+      const friendship = await createFriendship(session.accessToken, userId);
       setRequestedFriends((prev) => new Set([...prev, userId]));
+      setFriendships((prev) => [...prev.filter((f: any) => f?.id !== (friendship as any)?.id), friendship]);
       toastSuccess('Friend Request Sent', `Connected with ${name}.`);
     } catch (err) {
-      toastError('Connection Failed', err instanceof Error ? err.message : 'Could not connect.');
+      const message = err instanceof Error ? err.message : 'Could not connect.';
+      // The backend rejects duplicate requests — treat that as "already connected".
+      if (/already|exists|duplicate/i.test(message)) {
+        setRequestedFriends((prev) => new Set([...prev, userId]));
+        toastSuccess('Already Requested', `Friend request already sent to ${name}.`);
+        return;
+      }
+      toastError('Connection Failed', message);
     }
   };
 

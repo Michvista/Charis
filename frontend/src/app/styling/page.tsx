@@ -208,8 +208,10 @@ export default function StylingPage() {
           });
 
           // Step 2: Poll GET /verdict/<outfitId> until status === 'done' or 'failed'
+          // Verdicts can take 40-90s (image fetch + Gemini), so poll for up to ~3 min
+          // before declaring a timeout.
           let attempts = 0;
-          const maxAttempts = 10;
+          const maxAttempts = 90;
           let completed = false;
 
           while (attempts < maxAttempts && !completed) {
@@ -499,11 +501,11 @@ export default function StylingPage() {
                 {filteredWardrobeItems.length === 0 ? (
                   <p className="text-xs text-[#867272] italic py-4 text-center">No wardrobe items match your filter.</p>
                 ) : (
-                  <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 gap-2 md:gap-3 max-h-72 overflow-y-auto pr-1 pt-2 content-start">
+                  <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 gap-2 md:gap-3 max-h-72 overflow-y-auto pr-1 pt-2 content-start auto-rows-[96px] md:auto-rows-[112px]">
                     {filteredWardrobeItems.map((item, idx) => (
                       <button
                         key={item.id || `wardrobe-pick-${idx}`}
-                        className={`aspect-[3/4] rounded-xl border-2 overflow-hidden transition-all relative ${
+                        className={`w-full h-full min-h-0 rounded-xl border-2 overflow-hidden transition-all relative ${
                           selectedItems.has(item.id)
                             ? 'border-[#380208] ring-2 ring-[#380208]/30'
                             : 'border-transparent opacity-75 hover:opacity-100'

@@ -18,9 +18,10 @@ services:
     plan: free
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    # Free tier has no shell — run migrate + knowledge ingestion automatically
-    # before each deploy. Both are idempotent, so this is safe on every release.
-    releaseCommand: sh -c "python manage.py migrate && python manage.py ingest_style_knowledge"
+    # Free tier has no shell — run migrations before each deploy so tables always
+    # exist. Knowledge ingestion is idempotent and already populated, so it's left
+    # out here (it could hang on Gemini and block the deploy).
+    releaseCommand: sh -c "python manage.py migrate"
     envVars:
       - key: SECRET_KEY
         sync: false

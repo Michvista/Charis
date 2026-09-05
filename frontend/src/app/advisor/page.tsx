@@ -62,7 +62,42 @@ export default function AdvisorPage() {
       return;
     }
     listWishlist(session.accessToken)
-      .then((data) => setWishlist(Array.isArray(data) ? data : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : [];
+        setWishlist(list);
+
+        // One-time migration: import the old localStorage wishlist into the
+        // backend so nothing is lost, then drop the legacy key.
+        const legacyRaw = typeof window !== 'undefined' ? window.localStorage.getItem('charis.wishlist') : null;
+        if (legacyRaw) {
+          try {
+            const legacy = JSON.parse(legacyRaw);
+            const existingIds = new Set(list.map((w) => w.suggestion_id));
+            const missing = Array.isArray(legacy)
+              ? legacy.filter((o: any) => o?.id && !existingIds.has(o.id))
+              : [];
+            if (missing.length > 0) {
+              Promise.all(
+                missing.map((o: any) =>
+                  createWishlistItem(session.accessToken, {
+                    suggestion_id: o.id,
+                    occasion_description: o.occasion_description || '',
+                    item_description: o.item_description,
+                    reason: o.reason || '',
+                    priority: o.priority === 'high' || o.priority === 'medium' || o.priority === 'low' ? o.priority : 'medium',
+                  }).catch(() => null)
+                )
+              ).then((created) => {
+                const added = created.filter(Boolean) as WishlistItem[];
+                if (added.length) setWishlist((prev) => [...added, ...prev]);
+                window.localStorage.removeItem('charis.wishlist');
+              });
+            } else {
+              window.localStorage.removeItem('charis.wishlist');
+            }
+          } catch {}
+        }
+      })
       .catch(() => setWishlist([]));
   }, [session]);
 

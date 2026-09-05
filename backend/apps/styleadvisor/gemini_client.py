@@ -245,6 +245,7 @@ def generate_gemini_text_with_file_search(
                 types.Tool(
                     file_search=types.FileSearch(
                         file_search_store_names=[store_name],
+                        top_k=5,
                     )
                 )
             ],

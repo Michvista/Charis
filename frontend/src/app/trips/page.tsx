@@ -319,7 +319,7 @@ export default function TripsPage() {
                     }`}
                   >
                     <div className="flex justify-between items-center">
-                      <span className={`eyebrow ${selectedTrip?.id === t.id ? 'text-amber-200' : 'text-[#867272]'}`}>
+                      <span className={`eyebrow ${selectedTrip?.id === t.id ? 'text-amber-200!' : 'text-[#867272]'}`}>
                         {t.destination}
                       </span>
                       <div className="flex items-center gap-1">

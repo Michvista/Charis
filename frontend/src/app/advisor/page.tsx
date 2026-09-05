@@ -291,7 +291,7 @@ export default function AdvisorPage() {
           {/* Suggestions Grid */}
           {summary && (
             <div className="bg-[#380208] text-white rounded-2xl p-6 shadow-xl border border-[#380208]/20 flex flex-col gap-3">
-              <span className="eyebrow text-amber-200">Stylist's Overview</span>
+              <span className="eyebrow text-amber-200!">Stylist's Overview</span>
               <p className="text-sm leading-relaxed text-white">{summary}</p>
             </div>
           )}

@@ -55,8 +55,8 @@ export default function StylingPage() {
       const itemsPayload = wardrobeItems
         .filter((i) => selectedItems.has(i.id))
         .map((i) => ({
-          wardrobeItemId: i.id,
-          itemRole: i.category,
+          id: i.id,
+          category: i.category,
           imageUrl: i.image_url,
           colorHex: i.primary_color,
           formalityLevel: i.formality_level,
@@ -74,7 +74,8 @@ export default function StylingPage() {
         if (outfitId) {
           let attempts = 0;
           let done = false;
-          while (attempts < 10 && !done) {
+          // Combo generation reranks with Gemini per combo and can take 40-90s.
+          while (attempts < 90 && !done) {
             await new Promise((resolve) => setTimeout(resolve, 2000));
             attempts++;
             const v = await fetchVerdict(session.accessToken, outfitId);
@@ -699,33 +700,79 @@ export default function StylingPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {rankedCombos.map((combo, idx) => (
-                  <div key={idx} className="bg-white rounded-2xl border border-[#d9c1c0] p-5 shadow-sm flex flex-col gap-4 hover:shadow-lg transition-all">
-                    <div className="flex justify-between items-center border-b border-[#d9c1c0]/40 pb-3">
-                      <span className="serif text-xl font-bold text-[#380208]">Rank #{combo.rank || idx + 1}</span>
-                      <div className="flex items-baseline gap-0.5">
-                        <span className="serif text-2xl font-bold text-[#1e1b18]">{combo.score || combo.finalScore || 90}</span>
-                        <span className="text-xs text-[#867272]">% Harmony</span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 aspect-[4/3] bg-[#f5ece7] rounded-xl overflow-hidden p-1">
-                      {(combo.items || []).slice(0, 3).map((item: any, itemIdx: number) => (
-                        <div key={itemIdx} className="relative rounded-lg overflow-hidden bg-[#e9e1dc]">
-                          <img
-                            src={item.imageUrl || item.image_url || 'https://images.unsplash.com/photo-1544441893-675973e31985?w=300&q=80'}
-                            alt={item.name || 'Piece'}
-                            className="w-full h-full object-cover"
-                          />
+                {rankedCombos.map((combo, idx) => {
+                  const items = combo.items || [];
+                  const finalScore = combo.finalScore ?? combo.score ?? combo.visualScore ?? 0;
+                  return (
+                    <motion.div
+                      key={combo.comboId || idx}
+                      className="bg-white rounded-2xl border border-[#d9c1c0] p-5 shadow-sm flex flex-col gap-4 hover:shadow-xl hover:-translate-y-1 transition-all group overflow-hidden"
+                      initial={{ opacity: 0, y: 24, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: idx * 0.08, type: 'spring', stiffness: 120, damping: 18 }}
+                    >
+                      {/* Header */}
+                      <div className="flex items-center justify-between gap-2 border-b border-[#d9c1c0]/40 pb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-9 h-9 rounded-full bg-[#380208] text-white text-xs font-bold grid place-items-center shadow-md">
+                            {combo.rank || idx + 1}
+                          </span>
+                          <span className="eyebrow">Outfit #{combo.rank || idx + 1}</span>
                         </div>
-                      ))}
-                    </div>
+                        <div className="flex items-baseline gap-0.5">
+                          <span className="serif text-2xl font-bold text-[#380208]">{Math.round(finalScore)}</span>
+                          <span className="text-[11px] text-[#867272]">%</span>
+                        </div>
+                      </div>
 
-                    <p className="text-xs text-[#544342] leading-relaxed line-clamp-2">
-                      {combo.visualNotes || combo.notes || 'Curated high-compatibility combination.'}
-                    </p>
-                  </div>
-                ))}
+                      {/* Items grouped together */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {items.map((item: any, itemIdx: number) => (
+                          <div key={itemIdx} className="flex flex-col gap-1">
+                            <div className="aspect-[3/4] rounded-lg overflow-hidden bg-[#f5ece7] border border-[#d9c1c0]/40 shadow-sm">
+                              <img
+                                src={item.imageUrl || item.image_url || 'https://images.unsplash.com/photo-1544441893-675973e31985?w=300&q=80'}
+                                alt={item.name || item.category || 'Piece'}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              />
+                            </div>
+                            <p className="text-[10px] text-[#867272] capitalize text-center truncate">
+                              {item.category || item.itemRole || 'piece'}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* AI verdict for this combo */}
+                      {combo.visualNotes && (
+                        <p className="text-xs text-[#544342] leading-relaxed bg-[#fbf2ed] rounded-lg p-3 border border-[#d9c1c0]/30">
+                          {combo.visualNotes}
+                        </p>
+                      )}
+
+                      {/* Verdict badges */}
+                      <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-[#d9c1c0]/40">
+                        {combo.confirmed !== undefined && (
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+                            combo.confirmed ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'
+                          }`}>
+                            {combo.confirmed ? '✓ Confirmed' : '✗ Questionable'}
+                          </span>
+                        )}
+                        {combo.visualScore !== undefined && (
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-[#fbf2ed] text-[#380208] border border-[#d9c1c0]/40">
+                            Visual {Math.round(combo.visualScore)}%
+                          </span>
+                        )}
+                        {combo.score !== undefined && combo.finalScore !== undefined && (
+                          <span className="text-[10px] text-[#867272] font-semibold">
+                            Algorithmic {Math.round(combo.score)}% · Final {Math.round(combo.finalScore)}%
+                          </span>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
             </motion.div>
           )}

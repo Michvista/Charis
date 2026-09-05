@@ -7,11 +7,26 @@ try {
 } catch {}
 
 import { Worker } from "bullmq";
-import { closeRedisConnection } from "./shared/redis";
+import { closeRedisConnection, getRedisConnection } from "./shared/redis";
 import { startTaggingWorker } from "./processors/tagging.processor";
 import { startComboWorker } from "./processors/combo.processor";
 import { startVerdictWorker } from "./processors/verdict.processor";
 import { startNotificationsWorker } from "./notifications/notification.worker";
+
+// Log loudly if the worker cannot reach Redis — a silent mismatch between the
+// publisher's REDIS_URL and the worker's is the #1 cause of jobs never running.
+async function reportRedisStatus(): Promise<void> {
+  try {
+    const pong = await getRedisConnection().ping();
+    console.log(`[job-worker] Redis reachable (${pong})`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[job-worker] CRITICAL: cannot reach Redis — ${message}`);
+    console.error(
+      `[job-worker] check REDIS_URL=${process.env.REDIS_URL || "(unset, defaulting to localhost:6379)"}`,
+    );
+  }
+}
 
 const workers: Worker[] = [
   startTaggingWorker(),
@@ -19,6 +34,17 @@ const workers: Worker[] = [
   startVerdictWorker(),
   startNotificationsWorker(),
 ];
+
+for (const worker of workers) {
+  worker.on("error", (error) => {
+    console.error(`[job-worker] ${worker.name} worker error:`, error?.message ?? error);
+  });
+  worker.on("failed", (job, err) => {
+    console.error(`[job-worker] ${worker.name} job ${job?.id} failed:`, err?.message ?? err);
+  });
+}
+
+void reportRedisStatus();
 
 console.log(
   "job-worker listening on queues: wardrobe-tagging, combo-generation, outfit-verdict, notifications",

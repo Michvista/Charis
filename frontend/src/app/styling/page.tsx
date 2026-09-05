@@ -499,13 +499,13 @@ export default function StylingPage() {
                 {filteredWardrobeItems.length === 0 ? (
                   <p className="text-xs text-[#867272] italic py-4 text-center">No wardrobe items match your filter.</p>
                 ) : (
-                  <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 gap-3 max-h-56 overflow-y-auto pr-1 pt-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 gap-2 md:gap-3 max-h-72 overflow-y-auto pr-1 pt-2 content-start">
                     {filteredWardrobeItems.map((item, idx) => (
                       <button
                         key={item.id || `wardrobe-pick-${idx}`}
-                        className={`aspect-square rounded-xl border-2 overflow-hidden transition-all relative ${
+                        className={`aspect-[3/4] rounded-xl border-2 overflow-hidden transition-all relative ${
                           selectedItems.has(item.id)
-                            ? 'border-[#380208] ring-2 ring-[#380208]/30 scale-95'
+                            ? 'border-[#380208] ring-2 ring-[#380208]/30'
                             : 'border-transparent opacity-75 hover:opacity-100'
                         }`}
                         onClick={() => toggleItem(item.id)}

@@ -54,72 +54,90 @@ export default function HomePage() {
   });
   const [loadingSuggestion, setLoadingSuggestion] = useState(false);
 
-  // Fetch real temperature via browser Geolocation / Open-Meteo API
+  // Get coordinates: browser geolocation first, IP geolocation as a fallback
+  // (covers users who deny the browser prompt — the suggestion must still work).
+  const getCoordinates = async (): Promise<{ latitude: number; longitude: number } | null> => {
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      try {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 4000, maximumAge: 600000 });
+        });
+        return { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+      } catch {}
+    }
+    try {
+      const res = await fetch('https://ipwho.is/');
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data?.latitude === 'number' && typeof data?.longitude === 'number') {
+          return { latitude: data.latitude, longitude: data.longitude };
+        }
+      }
+    } catch {}
+    return null;
+  };
+
+  // Fetch real temperature via Geolocation / Open-Meteo API
   const fetchWeatherSuggestion = async () => {
     setLoadingSuggestion(true);
     try {
-      if (typeof window !== 'undefined' && 'geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          async (pos) => {
-            const { latitude, longitude } = pos.coords;
+      const coords = await getCoordinates();
+      if (coords) {
+        const { latitude, longitude } = coords;
+        try {
+          const res = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&temperature_unit=fahrenheit`
+          );
+          if (res.ok) {
+            const data = await res.json();
+            const tempF = Math.round(data.current?.temperature_2m ?? 70);
+            const condition = weatherCondition(data.current?.weather_code ?? 0);
+            const season = SEASON_BY_MONTH[new Date().getMonth()];
+            const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
             try {
-              const res = await fetch(
-                `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&temperature_unit=fahrenheit`
-              );
-              if (res.ok) {
-                const data = await res.json();
-                const tempF = Math.round(data.current?.temperature_2m ?? 70);
-                const condition = weatherCondition(data.current?.weather_code ?? 0);
-                const season = SEASON_BY_MONTH[new Date().getMonth()];
-                const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-
-                try {
-                  const aiRes = await fetch('/api/today-suggestion', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      timezone,
-                      currentTime: new Date().toISOString(),
-                      temp: tempF,
-                      condition,
-                      season,
-                      location: 'your current location',
-                    }),
-                  });
-                  const aiData = await aiRes.json();
-                  if (aiData?.title && aiData?.temp) {
-                    setSuggestion({
-                      title: aiData.title,
-                      temp: aiData.temp,
-                      detail: aiData.detail || 'Curated recommendation',
-                    });
-                    return;
-                  }
-                } catch {}
-
-                // Fallback: temperature-based editorial rule
-                let title = 'Silk Trench & Tailored Trousers';
-                let detail = 'Effortless elegance matched for mild weather.';
-
-                if (tempF > 75) {
-                  title = 'Linen Shirt & Wide Trousers';
-                  detail = 'Breathable lightweight layers for warm sun.';
-                } else if (tempF < 60) {
-                  title = 'Cashmere Knit & Wool Coat';
-                  detail = 'Insulating warmth for crisp, chilly air.';
-                }
-
+              const aiRes = await fetch('/api/today-suggestion', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  timezone,
+                  currentTime: new Date().toISOString(),
+                  temp: tempF,
+                  condition,
+                  season,
+                  location: 'your current location',
+                }),
+              });
+              const aiData = await aiRes.json();
+              if (aiData?.title && aiData?.temp) {
                 setSuggestion({
-                  title,
-                  temp: `${tempF}°F`,
-                  detail,
+                  title: aiData.title,
+                  temp: aiData.temp,
+                  detail: aiData.detail || 'Curated recommendation',
                 });
+                return;
               }
             } catch {}
-          },
-          () => {},
-          { timeout: 4000 }
-        );
+
+            // Fallback: temperature-based editorial rule
+            let title = 'Silk Trench & Tailored Trousers';
+            let detail = 'Effortless elegance matched for mild weather.';
+
+            if (tempF > 75) {
+              title = 'Linen Shirt & Wide Trousers';
+              detail = 'Breathable lightweight layers for warm sun.';
+            } else if (tempF < 60) {
+              title = 'Cashmere Knit & Wool Coat';
+              detail = 'Insulating warmth for crisp, chilly air.';
+            }
+
+            setSuggestion({
+              title,
+              temp: `${tempF}°F`,
+              detail,
+            });
+          }
+        } catch {}
       }
     } catch {} finally {
       setLoadingSuggestion(false);

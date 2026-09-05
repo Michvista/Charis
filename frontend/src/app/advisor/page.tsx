@@ -5,7 +5,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { useAuth } from '@/lib/context/AuthContext';
 import { useToast } from '@/lib/context/ToastContext';
-import { completeStyleAdvisor } from '@/api/styling.api';
+import { completeStyleAdvisor, listWishlist, createWishlistItem, deleteWishlistItem, type WishlistItem } from '@/api/styling.api';
 import { listWardrobeItems, createWardrobeItem } from '@/api/wardrobe.api';
 import { listOccasions } from '@/api/styling.api';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -52,16 +52,19 @@ export default function AdvisorPage() {
   const [activeItem, setActiveItem] = useState<StyleAdvisorSuggestion | null>(null);
   const [addingDraftId, setAddingDraftId] = useState<string | null>(null);
 
-  // Wishlist State with LocalStorage Persistence
-  const [wishlist, setWishlist] = useState<StyleAdvisorSuggestion[]>([]);
+  // Wishlist — persisted server-side (no localStorage)
+  const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
   const [showWishlistModal, setShowWishlistModal] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem('charis.wishlist');
-    if (saved) {
-      try { setWishlist(JSON.parse(saved)); } catch {}
+    if (!session?.accessToken) {
+      setWishlist([]);
+      return;
     }
-  }, []);
+    listWishlist(session.accessToken)
+      .then((data) => setWishlist(Array.isArray(data) ? data : []))
+      .catch(() => setWishlist([]));
+  }, [session]);
 
   // Restore cached advisor suggestions so a closed page doesn't lose results.
   // Expires after an hour; regenerating replaces it.
@@ -98,17 +101,42 @@ export default function AdvisorPage() {
     }).finally(() => setLoadingContext(false));
   }, [session]);
 
-  const toggleWishlist = (item: StyleAdvisorSuggestion) => {
-    const exists = wishlist.some((w) => w.id === item.id);
-    const updated = exists
-      ? wishlist.filter((w) => w.id !== item.id)
-      : [...wishlist, item];
-    setWishlist(updated);
-    localStorage.setItem('charis.wishlist', JSON.stringify(updated));
-    if (exists) {
-      toastSuccess('Removed from Wishlist', `Removed "${item.item_description}" from wishlist.`);
-    } else {
+  const toggleWishlist = async (item: StyleAdvisorSuggestion) => {
+    if (!session?.accessToken) return;
+    const existing = wishlist.find((w) => w.suggestion_id === item.id);
+    if (existing) {
+      try {
+        await deleteWishlistItem(session.accessToken, existing.id);
+        setWishlist((prev) => prev.filter((w) => w.id !== existing.id));
+        toastSuccess('Removed from Wishlist', `Removed "${item.item_description}" from wishlist.`);
+      } catch (err) {
+        toastError('Wishlist Error', err instanceof Error ? err.message : 'Could not remove item.');
+      }
+      return;
+    }
+    try {
+      const created = await createWishlistItem(session.accessToken, {
+        suggestion_id: item.id,
+        occasion_description: item.occasion_description || '',
+        item_description: item.item_description,
+        reason: item.reason || '',
+        priority: item.priority,
+      });
+      setWishlist((prev) => [created, ...prev]);
       toastSuccess('Saved to Wishlist', `"${item.item_description}" saved to your sartorial wishlist.`);
+    } catch (err) {
+      toastError('Wishlist Error', err instanceof Error ? err.message : 'Could not save item.');
+    }
+  };
+
+  const removeFromWishlist = async (item: WishlistItem) => {
+    if (!session?.accessToken) return;
+    try {
+      await deleteWishlistItem(session.accessToken, item.id);
+      setWishlist((prev) => prev.filter((w) => w.id !== item.id));
+      toastSuccess('Removed from Wishlist', `Removed "${item.item_description}" from wishlist.`);
+    } catch (err) {
+      toastError('Wishlist Error', err instanceof Error ? err.message : 'Could not remove item.');
     }
   };
 
@@ -299,7 +327,7 @@ export default function AdvisorPage() {
           {suggestions.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {suggestions.map((s, i) => {
-                const inWishlist = wishlist.some((w) => w.id === s.id);
+                const inWishlist = wishlist.some((w) => w.suggestion_id === s.id);
                 return (
                   <motion.div
                     key={s.id}
@@ -404,13 +432,13 @@ export default function AdvisorPage() {
                               )} Draft
                             </button>
                             <button
-                              onClick={() => { setActiveItem(item); setShowWishlistModal(false); }}
+                              onClick={() => { setActiveItem(item as unknown as StyleAdvisorSuggestion); setShowWishlistModal(false); }}
                               className="text-xs text-[#380208] font-semibold hover:underline"
                             >
                               Find
                             </button>
                             <button
-                              onClick={() => toggleWishlist(item)}
+                              onClick={() => removeFromWishlist(item)}
                               className="text-xs text-red-600 hover:underline font-semibold"
                             >
                               Remove

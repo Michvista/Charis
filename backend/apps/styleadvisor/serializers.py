@@ -1,6 +1,23 @@
 from rest_framework import serializers
 
-from .models import ShoppingSuggestion, StyleKnowledgeChunk
+from .models import ShoppingSuggestion, StyleKnowledgeChunk, WishlistItem
+
+
+class WishlistItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WishlistItem
+        fields = [
+            "id",
+            "user",
+            "suggestion_id",
+            "occasion_description",
+            "item_description",
+            "reason",
+            "priority",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "user", "created_at", "updated_at"]
 
 
 class StyleKnowledgeChunkSerializer(serializers.ModelSerializer):

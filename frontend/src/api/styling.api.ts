@@ -62,3 +62,28 @@ export async function completeStyleAdvisor(token: string, data: { occasion_descr
     body: data,
   });
 }
+
+export type WishlistItem = {
+  id: string;
+  user: string;
+  suggestion_id?: string | null;
+  occasion_description: string;
+  item_description: string;
+  reason: string;
+  priority: 'high' | 'medium' | 'low';
+  created_at: string;
+  updated_at: string;
+};
+
+export async function listWishlist(token: string): Promise<WishlistItem[]> {
+  const res = await requestBackend<any>('/styleadvisor/wishlist/', { method: 'GET', token });
+  return Array.isArray(res) ? res : (res?.results ?? []);
+}
+
+export async function createWishlistItem(token: string, data: { suggestion_id?: string; occasion_description?: string; item_description: string; reason?: string; priority: string }): Promise<WishlistItem> {
+  return requestBackend<WishlistItem>('/styleadvisor/wishlist/', { method: 'POST', token, body: data });
+}
+
+export async function deleteWishlistItem(token: string, id: string): Promise<void> {
+  await requestBackend(`/styleadvisor/wishlist/${id}/`, { method: 'DELETE', token });
+}

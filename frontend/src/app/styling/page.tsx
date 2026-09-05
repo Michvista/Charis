@@ -475,7 +475,7 @@ export default function StylingPage() {
                 </div>
 
                 {/* Category Tabs */}
-                <div className="flex gap-2 overflow-x-auto pb-1">
+                <div className="flex gap-2 overflow-x-auto scroll-touch pb-1">
                   {ITEM_CATEGORIES.map((cat) => (
                     <button
                       key={cat}

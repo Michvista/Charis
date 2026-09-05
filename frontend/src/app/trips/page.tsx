@@ -307,7 +307,7 @@ export default function TripsPage() {
             </div>
           ) : (
             <>
-              <div className="flex gap-4 overflow-x-auto pb-2 border-b border-[#d9c1c0]/50">
+              <div className="flex gap-4 overflow-x-auto scroll-touch pb-2 border-b border-[#d9c1c0]/50">
                 {trips.map((t) => (
                   <div
                     key={t.id}

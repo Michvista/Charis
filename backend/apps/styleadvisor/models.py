@@ -42,3 +42,29 @@ class ShoppingSuggestion(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.priority}: {self.item_description}"
+
+
+class WishlistItem(TimeStampedModel):
+    """A bookmarked style-advisor recommendation, persisted server-side."""
+
+    class Priority(models.TextChoices):
+        HIGH = "high", "High"
+        MEDIUM = "medium", "Medium"
+        LOW = "low", "Low"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="wishlist_items",
+    )
+    suggestion_id = models.UUIDField(blank=True, null=True)
+    occasion_description = models.TextField(blank=True, default="")
+    item_description = models.TextField()
+    reason = models.TextField(blank=True, default="")
+    priority = models.CharField(max_length=10, choices=Priority.choices)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.priority}: {self.item_description}"

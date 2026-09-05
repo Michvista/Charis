@@ -17,7 +17,7 @@ def _sync_to_store(content: str, source_file: str, title: str, content_hash: str
     "" when File Search is unavailable (local fallback handles retrieval).
     """
     client = get_genai_client()
-    store = get_file_search_store(client)
+    store = get_file_search_store(client) 
     if client is None or store is None:
         logger.warning(
             "[styleadvisor] File Search Store unavailable — knowledge saved to DB only "

@@ -80,3 +80,24 @@ input[type="radio"],
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Horizontal rows of buttons/cards: smooth touch scrolling on mobile */
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #d9c1c0 transparent;
+}
+
+.scroll-touch::-webkit-scrollbar {
+  height: 6px;
+}
+
+.scroll-touch::-webkit-scrollbar-thumb {
+  background: #d9c1c0;
+  border-radius: 9999px;
+}
+
+.scroll-touch::-webkit-scrollbar-track {
+  background: transparent;
+}

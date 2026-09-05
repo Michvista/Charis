@@ -48,11 +48,19 @@ export class BullMQPublisher {
   }
 
   async publishComboJob(data: ComboGenerationJobData): Promise<string> {
-    const job = await this.comboQueue.add("combo-generation", data);
-    return job.id || "job-queued";
+    try {
+      const job = await this.comboQueue.add("combo-generation", data);
+      return job.id || "job-queued";
+    } catch (error) {
+      // Redis unreachable (e.g. missing REDIS_URL on the host). Combos have a
+      // frontend fallback, so degrade gracefully instead of 500-ing the request.
+      console.error("[combos] failed to publish combo job:", error);
+      return "job-unavailable";
+    }
   }
 
   async publishVerdictJob(data: VerdictJobData): Promise<string> {
+    // Verdicts REQUIRE the worker, so a Redis failure stays loud here.
     const job = await this.verdictQueue.add("outfit-verdict", data);
     return job.id || "job-queued";
   }
